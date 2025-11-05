@@ -2,13 +2,6 @@
 
 Esta aplicación web, construida con Dash, monitoriza periódicamente un directorio en busca de nuevos archivos CSV con datos de aceleración. Cada vez que detecta un archivo, permite analizar un segmento configurable de la señal para estimar la frecuencia fundamental, identificar armónicos y calcular la tensión de un tirante a partir de sus propiedades físicas.
 
-La lógica de análisis se encuentra encapsulada en el paquete `tensiones_app/`, que está dividido en:
-
-- `analysis.py`: carga, limpieza y análisis espectral de las señales, junto con las gráficas de salida.
-- `layout.py`: definición de la interfaz y componentes principales de Dash.
-- `callbacks.py`: registro de los callbacks que conectan la interfaz con el motor de análisis.
-- `__init__.py`: fábrica de la aplicación (`create_app`) utilizada por `app.py`.
-
 ## Requisitos
 
 Instala las dependencias con:

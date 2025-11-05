@@ -63,10 +63,6 @@ def build_layout() -> html.Div:
                     html.Div(
                         [
                             html.H3("Parámetros de análisis", className="section-title"),
-                            html.P(
-                                "Ajusta cómo se procesa la señal para resaltar los armónicos relevantes.",
-                                className="section-description",
-                            ),
                             html.Div(
                                 [
                                     html.Div(

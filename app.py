@@ -553,7 +553,7 @@ def refresh_file_list(_: int, directory: str, current_value: Optional[str]):
     Output("sensor-dropdown", "options"),
     Output("sensor-dropdown", "value"),
     Output("file-info", "children"),
-    Output("error-message", "children"),
+    Output("error-message", "children", allow_duplicate=True),
     Input("file-dropdown", "value"),
     Input("map-textarea", "value"),
 )
@@ -587,7 +587,7 @@ def load_file(path: Optional[str], mapping_text: str):
     Output("results-table", "columns"),
     Output("results-table", "data"),
     Output("pct-label", "children"),
-    Output("error-message", "children"),
+    Output("error-message", "children", allow_duplicate=True),
     Input("data-store", "data"),
     Input("sensor-dropdown", "value"),
     Input("fs-input", "value"),

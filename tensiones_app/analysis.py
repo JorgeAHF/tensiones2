@@ -515,5 +515,8 @@ def get_directory_files(directory: str) -> List[str]:
         for fname in os.listdir(directory)
         if fname.lower().endswith(".csv")
     ]
-    files.sort(key=lambda path: os.path.getmtime(path), reverse=True)
+    # Process the oldest files first so the historical data is handled before
+    # newer captures. Ordering ascending by modification time makes the
+    # refresh callback pick the earliest pending file.
+    files.sort(key=lambda path: os.path.getmtime(path))
     return files

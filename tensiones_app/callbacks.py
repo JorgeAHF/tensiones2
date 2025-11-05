@@ -27,6 +27,42 @@ def register_callbacks(app: Dash) -> None:
         return int(seconds * 1000)
 
     @app.callback(
+        Output("directory-input", "value"),
+        Output("error-message", "children", allow_duplicate=True),
+        Input("select-directory-button", "n_clicks"),
+        State("directory-input", "value"),
+        prevent_initial_call=True,
+    )
+    def select_directory(n_clicks: Optional[int], current_value: Optional[str]):
+        if not n_clicks:
+            raise PreventUpdate
+
+        selected_dir: Optional[str] = None
+        root = None
+
+        try:
+            import tkinter as tk
+            from tkinter import filedialog
+
+            root = tk.Tk()
+            root.withdraw()
+            root.attributes("-topmost", True)
+            initial_dir = current_value if current_value else os.getcwd()
+            selected_dir = filedialog.askdirectory(initialdir=initial_dir)
+        except Exception as exc:  # pylint: disable=broad-except
+            if root is not None:
+                root.destroy()
+            return current_value, f"No se pudo abrir el selector de directorio: {exc}"
+        finally:
+            if root is not None:
+                root.destroy()
+
+        if not selected_dir:
+            raise PreventUpdate
+
+        return selected_dir, ""
+
+    @app.callback(
         Output("files-store", "data"),
         Output("file-dropdown", "options"),
         Output("file-dropdown", "value"),

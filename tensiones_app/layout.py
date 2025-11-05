@@ -65,80 +65,154 @@ def build_layout() -> html.Div:
                             html.H3("Parámetros de análisis", className="section-title"),
                             html.Div(
                                 [
-                                    html.Label("Fs (Hz)"),
-                                    dcc.Input(
-                                        id="fs-input",
-                                        type="number",
-                                        min=10,
-                                        max=2000,
-                                        step=1,
-                                        value=128,
+                                    html.Div(
+                                        [
+                                            html.H4("Frecuencia y resolución", className="subsection-title"),
+                                            html.P(
+                                                "Controla la frecuencia de muestreo y la resolución espectral.",
+                                                className="section-description",
+                                            ),
+                                            html.Div(
+                                                [
+                                                    html.Div(
+                                                        [
+                                                            html.Label("Fs (Hz)"),
+                                                            dcc.Input(
+                                                                id="fs-input",
+                                                                type="number",
+                                                                min=10,
+                                                                max=2000,
+                                                                step=1,
+                                                                value=128,
+                                                            ),
+                                                        ],
+                                                        className="control-item",
+                                                    ),
+                                                    html.Div(
+                                                        [
+                                                            html.Label("nperseg"),
+                                                            dcc.Input(
+                                                                id="nperseg-input",
+                                                                type="number",
+                                                                min=256,
+                                                                max=16384,
+                                                                step=256,
+                                                                value=4096,
+                                                            ),
+                                                        ],
+                                                        className="control-item",
+                                                    ),
+                                                    html.Div(
+                                                        [
+                                                            html.Label("noverlap"),
+                                                            dcc.Input(
+                                                                id="noverlap-input",
+                                                                type="number",
+                                                                min=0,
+                                                                max=16384,
+                                                                step=256,
+                                                                value=2048,
+                                                            ),
+                                                        ],
+                                                        className="control-item",
+                                                    ),
+                                                ],
+                                                className="control-grid",
+                                            ),
+                                        ],
+                                        className="parameter-section",
                                     ),
-                                    html.Label("nperseg"),
-                                    dcc.Input(
-                                        id="nperseg-input",
-                                        type="number",
-                                        min=256,
-                                        max=16384,
-                                        step=256,
-                                        value=4096,
+                                    html.Div(
+                                        [
+                                            html.H4("Detección de picos", className="subsection-title"),
+                                            html.P(
+                                                "Configura los criterios para identificar la frecuencia fundamental y armónicos.",
+                                                className="section-description",
+                                            ),
+                                            html.Div(
+                                                [
+                                                    html.Div(
+                                                        [
+                                                            html.Label("Suavizado σ"),
+                                                            dcc.Input(
+                                                                id="sigma-input",
+                                                                type="number",
+                                                                min=0.1,
+                                                                max=10.0,
+                                                                step=0.1,
+                                                                value=0.6,
+                                                            ),
+                                                        ],
+                                                        className="control-item",
+                                                    ),
+                                                    html.Div(
+                                                        [
+                                                            html.Label("Threshold"),
+                                                            dcc.Input(
+                                                                id="threshold-input",
+                                                                type="number",
+                                                                min=1e-12,
+                                                                max=1e-3,
+                                                                step=1e-7,
+                                                                value=2.5e-7,
+                                                            ),
+                                                        ],
+                                                        className="control-item",
+                                                    ),
+                                                    html.Div(
+                                                        [
+                                                            html.Label("Min distancia (Hz)"),
+                                                            dcc.Input(
+                                                                id="min-distance-input",
+                                                                type="number",
+                                                                min=0.1,
+                                                                max=10.0,
+                                                                step=0.1,
+                                                                value=0.3,
+                                                            ),
+                                                        ],
+                                                        className="control-item",
+                                                    ),
+                                                    html.Div(
+                                                        [
+                                                            html.Label("N° Armónicos"),
+                                                            dcc.Input(
+                                                                id="harmonics-input",
+                                                                type="number",
+                                                                min=1,
+                                                                max=5,
+                                                                step=1,
+                                                                value=2,
+                                                            ),
+                                                        ],
+                                                        className="control-item",
+                                                    ),
+                                                ],
+                                                className="control-grid",
+                                            ),
+                                        ],
+                                        className="parameter-section",
                                     ),
-                                    html.Label("noverlap"),
-                                    dcc.Input(
-                                        id="noverlap-input",
-                                        type="number",
-                                        min=0,
-                                        max=16384,
-                                        step=256,
-                                        value=2048,
+                                    html.Div(
+                                        [
+                                            html.H4("Ventana temporal", className="subsection-title"),
+                                            html.P(
+                                                "Limita el tramo del archivo que se utiliza en el cálculo.",
+                                                className="section-description",
+                                            ),
+                                            dcc.RangeSlider(
+                                                id="pct-range",
+                                                min=0,
+                                                max=100,
+                                                step=0.1,
+                                                value=[0, 100],
+                                            ),
+                                            html.Div(id="pct-label", className="info"),
+                                        ],
+                                        className="parameter-section",
                                     ),
-                                    html.Label("Suavizado σ"),
-                                    dcc.Input(
-                                        id="sigma-input",
-                                        type="number",
-                                        min=0.1,
-                                        max=10.0,
-                                        step=0.1,
-                                        value=0.6,
-                                    ),
-                                    html.Label("Threshold"),
-                                    dcc.Input(
-                                        id="threshold-input",
-                                        type="number",
-                                        min=1e-12,
-                                        max=1e-3,
-                                        step=1e-7,
-                                        value=2.5e-7,
-                                    ),
-                                    html.Label("Min distancia (Hz)"),
-                                    dcc.Input(
-                                        id="min-distance-input",
-                                        type="number",
-                                        min=0.1,
-                                        max=10.0,
-                                        step=0.1,
-                                        value=0.3,
-                                    ),
-                                    html.Label("N° Armónicos"),
-                                    dcc.Input(
-                                        id="harmonics-input",
-                                        type="number",
-                                        min=1,
-                                        max=5,
-                                        step=1,
-                                        value=2,
-                                    ),
-                                    html.Label("Rango del archivo (%)"),
-                                    dcc.RangeSlider(
-                                        id="pct-range",
-                                        min=0,
-                                        max=100,
-                                        step=0.1,
-                                        value=[0, 100],
-                                    ),
-                                    html.Div(id="pct-label", className="info"),
                                 ],
-                                className="grid",
+                                className="parameter-stack",
                             ),
                             html.H3("f₀ propuesta", className="section-title"),
                             dcc.Checklist(
@@ -189,15 +263,39 @@ def build_layout() -> html.Div:
             html.Hr(className="divider"),
             html.Div(
                 [
-                    dcc.Graph(id="accelerogram-full"),
-                    dcc.Graph(id="accelerogram-segment"),
+                    html.Div(
+                        [
+                            html.H3("Acelerograma completo", className="graph-title"),
+                            dcc.Graph(id="accelerogram-full", config={"displaylogo": False}),
+                        ],
+                        className="graph-card",
+                    ),
+                    html.Div(
+                        [
+                            html.H3("Segmento seleccionado", className="graph-title"),
+                            dcc.Graph(id="accelerogram-segment", config={"displaylogo": False}),
+                        ],
+                        className="graph-card",
+                    ),
                 ],
                 className="graph-row",
             ),
             html.Div(
                 [
-                    dcc.Graph(id="psd-graph"),
-                    dcc.Graph(id="stft-graph"),
+                    html.Div(
+                        [
+                            html.H3("Espectro de potencia", className="graph-title"),
+                            dcc.Graph(id="psd-graph", config={"displaylogo": False}),
+                        ],
+                        className="graph-card",
+                    ),
+                    html.Div(
+                        [
+                            html.H3("Espectrograma (STFT)", className="graph-title"),
+                            dcc.Graph(id="stft-graph", config={"displaylogo": False}),
+                        ],
+                        className="graph-card",
+                    ),
                 ],
                 className="graph-row",
             ),

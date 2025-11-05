@@ -10,12 +10,21 @@ def build_layout() -> html.Div:
 
     return html.Div(
         [
-            html.H1("Monitor automático de tensión"),
+            html.Div(
+                [
+                    html.H1("Monitor automático de tensión", className="app-title"),
+                    html.P(
+                        "Configure y supervise los parámetros clave de cada tirante en tiempo real.",
+                        className="app-subtitle",
+                    ),
+                ],
+                className="header",
+            ),
             html.Div(
                 [
                     html.Div(
                         [
-                            html.H3("Configuración"),
+                            html.H3("Configuración", className="section-title"),
                             html.Label("Directorio de datos"),
                             dcc.Input(
                                 id="directory-input",
@@ -43,17 +52,17 @@ def build_layout() -> html.Div:
                             ),
                             html.Br(),
                             html.Label("Archivo seleccionado"),
-                            dcc.Dropdown(id="file-dropdown"),
+                            dcc.Dropdown(id="file-dropdown", placeholder="Seleccione un archivo"),
                             html.Div(id="file-info", className="info"),
                             html.Br(),
                             html.Label("Tirante"),
-                            dcc.Dropdown(id="sensor-dropdown"),
+                            dcc.Dropdown(id="sensor-dropdown", placeholder="Seleccione un tirante"),
                         ],
                         className="panel",
                     ),
                     html.Div(
                         [
-                            html.H3("Parámetros de análisis"),
+                            html.H3("Parámetros de análisis", className="section-title"),
                             html.Div(
                                 [
                                     html.Label("Fs (Hz)"),
@@ -131,7 +140,7 @@ def build_layout() -> html.Div:
                                 ],
                                 className="grid",
                             ),
-                            html.H3("f₀ propuesta"),
+                            html.H3("f₀ propuesta", className="section-title"),
                             dcc.Checklist(
                                 options=[{"label": "Usar f₀ propuesta", "value": "use"}],
                                 value=[],
@@ -154,7 +163,7 @@ def build_layout() -> html.Div:
                                 step=0.01,
                                 value=0.15,
                             ),
-                            html.H3("Cálculo de tensión"),
+                            html.H3("Cálculo de tensión", className="section-title"),
                             html.Label("Longitud (m)"),
                             dcc.Input(
                                 id="length-input",
@@ -177,7 +186,7 @@ def build_layout() -> html.Div:
                 ],
                 className="layout",
             ),
-            html.Hr(),
+            html.Hr(className="divider"),
             html.Div(
                 [
                     dcc.Graph(id="accelerogram-full"),
@@ -192,11 +201,35 @@ def build_layout() -> html.Div:
                 ],
                 className="graph-row",
             ),
-            html.H2("Resultados"),
-            DataTable(id="results-table", columns=[], data=[]),
+            html.H2("Resultados", className="section-title"),
+            DataTable(
+                id="results-table",
+                columns=[],
+                data=[],
+                style_header={
+                    "backgroundColor": "transparent",
+                    "fontWeight": "600",
+                    "textTransform": "uppercase",
+                },
+                style_cell={
+                    "backgroundColor": "rgba(255, 255, 255, 0.05)",
+                    "border": "0px",
+                    "color": "#f1f5f9",
+                    "fontFamily": "'Inter', 'Segoe UI', sans-serif",
+                    "padding": "12px",
+                },
+                style_data_conditional=[
+                    {
+                        "if": {"state": "selected"},
+                        "backgroundColor": "rgba(148, 163, 184, 0.25)",
+                        "border": "0px",
+                    }
+                ],
+            ),
             dcc.Interval(id="polling-interval", interval=30000, n_intervals=0),
             dcc.Store(id="data-store"),
             dcc.Store(id="files-store"),
             html.Div(id="error-message", className="error"),
-        ]
+        ],
+        className="app-container",
     )

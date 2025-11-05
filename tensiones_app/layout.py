@@ -33,6 +33,12 @@ def build_layout() -> html.Div:
                                 debounce=True,
                                 style={"width": "100%"},
                             ),
+                            html.Button(
+                                "Seleccionar directorio",
+                                id="select-directory-button",
+                                className="directory-button",
+                                n_clicks=0,
+                            ),
                             html.Br(),
                             html.Label("Intervalo de actualización (s)"),
                             dcc.Input(

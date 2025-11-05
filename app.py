@@ -587,7 +587,7 @@ def load_file(path: Optional[str], mapping_text: str):
     Output("results-table", "columns"),
     Output("results-table", "data"),
     Output("pct-label", "children"),
-    Output("error-message", "children", allow_duplicate=True),
+    Output("error-message", "children"),
     Input("data-store", "data"),
     Input("sensor-dropdown", "value"),
     Input("fs-input", "value"),
@@ -603,7 +603,6 @@ def load_file(path: Optional[str], mapping_text: str):
     Input("tol-input", "value"),
     Input("length-input", "value"),
     Input("density-input", "value"),
-    prevent_initial_call=True,
 )
 def update_analysis(
     store_data,

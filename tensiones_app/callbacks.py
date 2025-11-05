@@ -3,12 +3,13 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 from datetime import datetime
 from typing import Any, Dict, Optional
 
 import pandas as pd
 import plotly.graph_objects as go
-from dash import Dash, Input, Output, State
+from dash import Dash, Input, Output, State, no_update
 from dash.exceptions import PreventUpdate
 
 from .analysis import analyse_signal, get_directory_files, load_and_prepare_data_from_file
@@ -63,14 +64,121 @@ def register_callbacks(app: Dash) -> None:
         return selected_dir, ""
 
     @app.callback(
+        Output("sensor-config-table", "data"),
+        Output("mapping-status", "children"),
+        Output("sensor-config-store", "data"),
+        Output("error-message", "children", allow_duplicate=True),
+        Input("apply-map-button", "n_clicks"),
+        State("map-textarea", "value"),
+        prevent_initial_call=True,
+    )
+    def apply_mapping(n_clicks: Optional[int], mapping_text: Optional[str]):
+        if not n_clicks:
+            raise PreventUpdate
+
+        try:
+            sensor_map: Dict[str, str] = json.loads(mapping_text or "{}")
+        except json.JSONDecodeError as exc:
+            return no_update, "", None, f"Error en mapeo JSON: {exc}"
+
+        if not sensor_map:
+            return [], "Defina al menos un sensor en el mapeo.", None, ""
+
+        table_rows = [
+            {
+                "column": original,
+                "tirante": (alias or original),
+                "f0": None,
+                "length": None,
+                "density": None,
+            }
+            for original, alias in sensor_map.items()
+        ]
+
+        mapping_message = f"Mapeo aplicado para {len(table_rows)} tirantes. Complete los parámetros."
+        store_payload = {"rows": table_rows, "complete": False, "by_sensor": {}}
+        return table_rows, mapping_message, store_payload, ""
+
+    @app.callback(
+        Output("sensor-config-store", "data", allow_duplicate=True),
+        Output("sensor-config-status", "children"),
+        Input("sensor-config-table", "data"),
+        prevent_initial_call=True,
+    )
+    def sync_sensor_config(rows: Optional[list[dict[str, Any]]]):
+        if not rows:
+            return None, "Configure los sensores para habilitar la lectura de datos."
+
+        complete = True
+        issues: list[str] = []
+        by_sensor: Dict[str, Dict[str, Optional[float]]] = {}
+        seen: set[str] = set()
+
+        for idx, row in enumerate(rows, start=1):
+            column = row.get("column")
+            tirante = (row.get("tirante") or "").strip()
+
+            def _to_float(value: Any) -> Optional[float]:
+                if value in (None, ""):
+                    return None
+                try:
+                    return float(value)
+                except (TypeError, ValueError):
+                    return None
+
+            f0 = _to_float(row.get("f0"))
+            length = _to_float(row.get("length"))
+            density = _to_float(row.get("density"))
+
+            if not tirante:
+                complete = False
+                issues.append(f"Fila {idx}: faltó definir el nombre del tirante.")
+            elif tirante in seen:
+                complete = False
+                issues.append(f"Fila {idx}: el tirante '{tirante}' está duplicado.")
+            else:
+                seen.add(tirante)
+
+            if f0 is None or f0 <= 0:
+                complete = False
+            if length is None or length <= 0:
+                complete = False
+            if density is None or density <= 0:
+                complete = False
+
+            if tirante:
+                by_sensor[tirante] = {
+                    "column": column,
+                    "f0": f0,
+                    "length": length,
+                    "density": density,
+                }
+
+        status = (
+            "Parámetros completos. Puede seleccionar archivos para iniciar el análisis."
+            if complete
+            else "Complete la frecuencia fundamental y parámetros físicos para cada tirante."
+        )
+        if issues:
+            status = " | ".join([status] + issues)
+
+        store_payload = {"rows": rows, "complete": complete, "by_sensor": by_sensor}
+        return store_payload, status
+
+    @app.callback(
         Output("files-store", "data"),
         Output("file-dropdown", "options"),
         Output("file-dropdown", "value"),
         Input("polling-interval", "n_intervals"),
         Input("directory-input", "value"),
+        Input("sensor-config-store", "data"),
         State("file-dropdown", "value"),
     )
-    def refresh_file_list(_: int, directory: str, current_value: Optional[str]):
+    def refresh_file_list(_: int, directory: str, config_data: Optional[Dict[str, Any]], current_value: Optional[str]):
+        config_complete = bool(config_data and config_data.get("complete"))
+        if not directory or not config_complete:
+            return [], [], None
+
         files = get_directory_files(directory or "")
         options = [
             {
@@ -88,30 +196,56 @@ def register_callbacks(app: Dash) -> None:
         Output("sensor-dropdown", "value"),
         Output("file-info", "children"),
         Output("error-message", "children", allow_duplicate=True),
+        Output("file-dropdown", "value", allow_duplicate=True),
         Input("file-dropdown", "value"),
         Input("map-textarea", "value"),
+        State("sensor-config-store", "data"),
         prevent_initial_call="initial_duplicate",
     )
-    def load_file(path: Optional[str], mapping_text: str):
+    def load_file(path: Optional[str], mapping_text: str, config_data: Optional[Dict[str, Any]]):
         if not path:
             raise PreventUpdate
+
+        if not config_data or not config_data.get("complete"):
+            return None, [], None, "", "Complete la configuración de los tirantes antes de continuar.", no_update
 
         try:
             sensor_map: Dict[str, str] = json.loads(mapping_text or "{}")
         except json.JSONDecodeError as exc:
-            return None, [], None, "", f"Error en mapeo JSON: {exc}"
+            return None, [], None, "", f"Error en mapeo JSON: {exc}", no_update
 
         try:
             df = load_and_prepare_data_from_file(path, sensor_map)
         except Exception as exc:  # pylint: disable=broad-except
-            return None, [], None, "", f"Error al leer archivo: {exc}"
+            return None, [], None, "", f"Error al leer archivo: {exc}", no_update
+
+        by_sensor: Dict[str, Dict[str, Any]] = config_data.get("by_sensor", {})
+        sensors = [col for col in df.columns if col in by_sensor]
+        if not sensors:
+            return None, [], None, "", "El archivo no contiene tirantes configurados.", None
 
         store_data = {"df": df.to_json(orient="split")}
-        sensors = [col for col in df.columns if col != df.columns[0]]
         sensor_options = [{"label": col, "value": col} for col in sensors]
-        sensor_value = sensors[0] if sensors else None
-        info = f"Total de muestras: {len(df)}"
-        return store_data, sensor_options, sensor_value, info, ""
+        sensor_value = sensors[0]
+
+        processed_dir = os.path.join(os.path.dirname(path), "procesados")
+        os.makedirs(processed_dir, exist_ok=True)
+        destination = os.path.join(processed_dir, os.path.basename(path))
+        if os.path.exists(destination):
+            base, ext = os.path.splitext(os.path.basename(path))
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            destination = os.path.join(processed_dir, f"{base}_{timestamp}{ext}")
+
+        try:
+            shutil.move(path, destination)
+        except Exception as exc:  # pylint: disable=broad-except
+            info = f"Total de muestras: {len(df)}. No se pudo mover el archivo: {exc}"
+        else:
+            info = (
+                f"Total de muestras: {len(df)}. Archivo movido a 'procesados/{os.path.basename(destination)}'."
+            )
+
+        return store_data, sensor_options, sensor_value, info, "", None
 
     @app.callback(
         Output("accelerogram-full", "figure"),
@@ -132,11 +266,8 @@ def register_callbacks(app: Dash) -> None:
         Input("threshold-input", "value"),
         Input("min-distance-input", "value"),
         Input("harmonics-input", "value"),
-        Input("use-f0-hint", "value"),
-        Input("f0-hint-input", "value"),
         Input("tol-input", "value"),
-        Input("length-input", "value"),
-        Input("density-input", "value"),
+        Input("sensor-config-store", "data"),
         prevent_initial_call="initial_duplicate",
     )
     def update_analysis(
@@ -150,17 +281,30 @@ def register_callbacks(app: Dash) -> None:
         threshold,
         min_distance,
         n_harmonics,
-        use_hint_values,
-        f0_hint,
         tol_hz,
-        length_m,
-        linear_density,
+        sensor_config_data: Optional[Dict[str, Any]],
     ):
         if not store_data or not sensor:
             return EMPTY_FIGURE, EMPTY_FIGURE, EMPTY_FIGURE, EMPTY_FIGURE, [], [], "", ""
 
+        sensor_params = (sensor_config_data or {}).get("by_sensor", {}).get(sensor)
+        if not sensor_params:
+            return (
+                EMPTY_FIGURE,
+                EMPTY_FIGURE,
+                EMPTY_FIGURE,
+                EMPTY_FIGURE,
+                [],
+                [],
+                "",
+                "No se encontraron parámetros configurados para el tirante seleccionado.",
+            )
+
         df = pd.read_json(store_data["df"], orient="split")
-        use_hint = "use" in (use_hint_values or [])
+        f0_hint = sensor_params.get("f0")
+        length_m = sensor_params.get("length")
+        linear_density = sensor_params.get("density")
+        use_hint = f0_hint is not None and f0_hint > 0
 
         try:
             (
@@ -235,3 +379,44 @@ def register_callbacks(app: Dash) -> None:
             pct_label,
             "",
         )
+
+    @app.callback(
+        Output("file-dropdown", "disabled"),
+        Input("sensor-config-store", "data"),
+    )
+    def toggle_file_dropdown(config_data: Optional[Dict[str, Any]]) -> bool:
+        return not (config_data and config_data.get("complete"))
+
+    @app.callback(
+        Output("sensor-dropdown", "disabled"),
+        Input("data-store", "data"),
+    )
+    def toggle_sensor_dropdown(store_data: Optional[Dict[str, Any]]) -> bool:
+        return not bool(store_data)
+
+    @app.callback(
+        Output("selected-sensor-summary", "children"),
+        Input("sensor-dropdown", "value"),
+        Input("sensor-config-store", "data"),
+    )
+    def update_selected_sensor_summary(
+        sensor: Optional[str], config_data: Optional[Dict[str, Any]]
+    ) -> str:
+        if not sensor or not config_data:
+            return ""
+
+        params = (config_data.get("by_sensor") or {}).get(sensor)
+        if not params:
+            return "No hay parámetros guardados para el tirante seleccionado."
+
+        f0 = params.get("f0")
+        length = params.get("length")
+        density = params.get("density")
+        details = []
+        if f0:
+            details.append(f"f₀ inicial: {f0:.2f} Hz")
+        if length:
+            details.append(f"Longitud: {length:.2f} m")
+        if density:
+            details.append(f"Masa lineal: {density:.3f} kg/m")
+        return " · ".join(details) if details else ""

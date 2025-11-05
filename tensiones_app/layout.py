@@ -24,13 +24,18 @@ def build_layout() -> html.Div:
                 [
                     html.Div(
                         [
-                            html.H3("Configuración", className="section-title"),
+                            html.H3("Paso 1 · Directorio de trabajo", className="section-title"),
+                            html.P(
+                                "Seleccione la carpeta que contiene los archivos CSV generados por el sistema.",
+                                className="section-description",
+                            ),
                             html.Label("Directorio de datos"),
                             dcc.Input(
                                 id="directory-input",
                                 type="text",
-                                value="./data",
+                                value="",
                                 debounce=True,
+                                placeholder="Ej: C:/monitoreo/tirantes",
                                 style={"width": "100%"},
                             ),
                             html.Button(
@@ -49,23 +54,131 @@ def build_layout() -> html.Div:
                                 step=5,
                                 value=30,
                             ),
-                            html.Br(),
+                        ],
+                        className="panel",
+                    ),
+                    html.Div(
+                        [
+                            html.H3("Paso 2 · Mapeo de sensores", className="section-title"),
+                            html.P(
+                                "Indique cómo se deben renombrar las columnas de los archivos para cada tirante.",
+                                className="section-description",
+                            ),
                             html.Label("Mapeo de sensores (JSON)"),
                             dcc.Textarea(
                                 id="map-textarea",
                                 value="{}",
-                                style={"width": "100%", "height": "120px"},
+                                placeholder='{"canal_raw": "Tirante 1"}',
+                                style={"width": "100%", "height": "140px"},
                             ),
-                            html.Br(),
-                            html.Label("Archivo seleccionado"),
-                            dcc.Dropdown(id="file-dropdown", placeholder="Seleccione un archivo"),
-                            html.Div(id="file-info", className="info"),
-                            html.Br(),
-                            html.Label("Tirante"),
-                            dcc.Dropdown(id="sensor-dropdown", placeholder="Seleccione un tirante"),
+                            html.Button(
+                                "Aplicar mapeo",
+                                id="apply-map-button",
+                                className="directory-button",
+                                n_clicks=0,
+                            ),
+                            html.Div(id="mapping-status", className="info"),
                         ],
                         className="panel",
                     ),
+                ],
+                className="layout",
+            ),
+            html.Div(
+                [
+                    html.Div(
+                        [
+                            html.H3("Paso 3 · Parámetros por tirante", className="section-title"),
+                            html.P(
+                                "Complete la frecuencia fundamental inicial y las propiedades físicas de cada tirante.",
+                                className="section-description",
+                            ),
+                            DataTable(
+                                id="sensor-config-table",
+                                columns=[
+                                    {
+                                        "name": "Columna original",
+                                        "id": "column",
+                                        "editable": False,
+                                    },
+                                    {
+                                        "name": "Tirante",
+                                        "id": "tirante",
+                                        "editable": True,
+                                    },
+                                    {
+                                        "name": "f₀ inicial (Hz)",
+                                        "id": "f0",
+                                        "type": "numeric",
+                                        "editable": True,
+                                    },
+                                    {
+                                        "name": "Longitud (m)",
+                                        "id": "length",
+                                        "type": "numeric",
+                                        "editable": True,
+                                    },
+                                    {
+                                        "name": "Masa lineal (kg/m)",
+                                        "id": "density",
+                                        "type": "numeric",
+                                        "editable": True,
+                                    },
+                                ],
+                                data=[],
+                                editable=True,
+                                style_header={
+                                    "backgroundColor": "rgba(148, 163, 184, 0.15)",
+                                    "fontWeight": "600",
+                                },
+                                style_cell={
+                                    "backgroundColor": "rgba(255, 255, 255, 0.04)",
+                                    "border": "0px",
+                                    "color": "#f1f5f9",
+                                    "fontFamily": "'Inter', 'Segoe UI', sans-serif",
+                                },
+                                style_data_conditional=[
+                                    {
+                                        "if": {"column_id": "column"},
+                                        "fontWeight": "500",
+                                        "color": "#cbd5f5",
+                                    }
+                                ],
+                            ),
+                            html.Div(id="sensor-config-status", className="info"),
+                        ],
+                        className="panel",
+                    ),
+                    html.Div(
+                        [
+                            html.H3("Paso 4 · Selección y análisis", className="section-title"),
+                            html.P(
+                                "Una vez completados los pasos anteriores, seleccione el archivo y el tirante a analizar.",
+                                className="section-description",
+                            ),
+                            html.Label("Archivo seleccionado"),
+                            dcc.Dropdown(
+                                id="file-dropdown",
+                                placeholder="Seleccione un archivo",
+                                disabled=True,
+                            ),
+                            html.Div(id="file-info", className="info"),
+                            html.Br(),
+                            html.Label("Tirante"),
+                            dcc.Dropdown(
+                                id="sensor-dropdown",
+                                placeholder="Seleccione un tirante",
+                                disabled=True,
+                            ),
+                            html.Div(id="selected-sensor-summary", className="info"),
+                        ],
+                        className="panel",
+                    ),
+                ],
+                className="layout",
+            ),
+            html.Div(
+                [
                     html.Div(
                         [
                             html.H3("Parámetros de análisis", className="section-title"),
@@ -224,32 +337,13 @@ def build_layout() -> html.Div:
                                     ),
                                     html.Div(
                                         [
-                                            html.H4("Ayuda basada en conocimiento", className="subsection-title"),
+                                            html.H4("Búsqueda guiada", className="subsection-title"),
                                             html.P(
-                                                "Utiliza una estimación previa de f₀ para guiar la detección automática y restringir el rango de búsqueda.",
+                                                "El análisis utilizará la frecuencia fundamental inicial definida para el tirante seleccionado.",
                                                 className="section-description",
                                             ),
                                             html.Div(
                                                 [
-                                                    dcc.Checklist(
-                                                        options=[{"label": "Usar f₀ propuesta", "value": "use"}],
-                                                        value=[],
-                                                        id="use-f0-hint",
-                                                        className="toggle-input",
-                                                    ),
-                                                    html.Div(
-                                                        [
-                                                            html.Label("f₀ propuesta (Hz)"),
-                                                            dcc.Input(
-                                                                id="f0-hint-input",
-                                                                type="number",
-                                                                min=0.0,
-                                                                step=0.01,
-                                                                value=2.0,
-                                                            ),
-                                                        ],
-                                                        className="control-item",
-                                                    ),
                                                     html.Div(
                                                         [
                                                             html.Label("Tol ± (Hz)"),
@@ -260,47 +354,6 @@ def build_layout() -> html.Div:
                                                                 max=5.0,
                                                                 step=0.01,
                                                                 value=0.15,
-                                                            ),
-                                                        ],
-                                                        className="control-item",
-                                                    ),
-                                                ],
-                                                className="control-grid",
-                                            ),
-                                        ],
-                                        className="parameter-section",
-                                    ),
-                                    html.Div(
-                                        [
-                                            html.H4("Cálculo de tensión", className="subsection-title"),
-                                            html.P(
-                                                "Define las propiedades físicas del tirante para estimar la tensión correspondiente a la frecuencia fundamental.",
-                                                className="section-description",
-                                            ),
-                                            html.Div(
-                                                [
-                                                    html.Div(
-                                                        [
-                                                            html.Label("Longitud (m)"),
-                                                            dcc.Input(
-                                                                id="length-input",
-                                                                type="number",
-                                                                min=0.0,
-                                                                step=0.1,
-                                                                value=1.0,
-                                                            ),
-                                                        ],
-                                                        className="control-item",
-                                                    ),
-                                                    html.Div(
-                                                        [
-                                                            html.Label("Masa lineal (kg/m)"),
-                                                            dcc.Input(
-                                                                id="density-input",
-                                                                type="number",
-                                                                min=0.0,
-                                                                step=0.01,
-                                                                value=0.5,
                                                             ),
                                                         ],
                                                         className="control-item",
@@ -387,6 +440,7 @@ def build_layout() -> html.Div:
             dcc.Interval(id="polling-interval", interval=30000, n_intervals=0),
             dcc.Store(id="data-store"),
             dcc.Store(id="files-store"),
+            dcc.Store(id="sensor-config-store"),
             html.Div(id="error-message", className="error"),
         ],
         className="app-container",

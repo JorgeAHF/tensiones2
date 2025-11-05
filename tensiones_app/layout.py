@@ -4,6 +4,8 @@ from __future__ import annotations
 from dash import dcc, html
 from dash.dash_table import DataTable
 
+from .storage import load_last_mapping_text
+
 
 def build_layout() -> html.Div:
     """Return the root layout for the application."""
@@ -109,7 +111,7 @@ def build_layout() -> html.Div:
                             html.Label("Mapeo de sensores (JSON)"),
                             dcc.Textarea(
                                 id="map-textarea",
-                                value="{}",
+                                value=load_last_mapping_text(),
                                 placeholder='{"canal_raw": {"tirante": "Tirante 1", "f0": 1.2, "ke": 0.45}}',
                                 style={"width": "100%", "height": "140px"},
                             ),
@@ -225,6 +227,34 @@ def build_layout() -> html.Div:
                             html.Div(
                                 "En espera de archivos nuevos.",
                                 id="file-info",
+                                className="info",
+                            ),
+                            html.Div(
+                                [
+                                    html.Button(
+                                        "Iniciar",
+                                        id="start-processing",
+                                        className="directory-button",
+                                        n_clicks=0,
+                                    ),
+                                    html.Button(
+                                        "Pausar",
+                                        id="pause-processing",
+                                        className="directory-button",
+                                        n_clicks=0,
+                                    ),
+                                    html.Button(
+                                        "Detener",
+                                        id="stop-processing",
+                                        className="directory-button",
+                                        n_clicks=0,
+                                    ),
+                                ],
+                                className="panel-actions",
+                            ),
+                            html.Div(
+                                "Lectura detenida. Presione Iniciar para comenzar.",
+                                id="processing-status",
                                 className="info",
                             ),
                             html.Br(),
@@ -502,11 +532,14 @@ def build_layout() -> html.Div:
                     }
                 ],
             ),
-            dcc.Interval(id="polling-interval", interval=30000, n_intervals=0),
+            dcc.Interval(
+                id="polling-interval", interval=30000, n_intervals=0, disabled=True
+            ),
             dcc.Store(id="data-store"),
             dcc.Store(id="files-store"),
             dcc.Store(id="sensor-config-store"),
             dcc.Store(id="active-file-store"),
+            dcc.Store(id="processing-state", data="stopped"),
             html.Div(id="error-message", className="error"),
         ],
         className="app-container",

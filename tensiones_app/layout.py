@@ -107,20 +107,22 @@ def build_layout() -> html.Div:
                                 data=[],
                                 editable=True,
                                 style_header={
-                                    "backgroundColor": "rgba(148, 163, 184, 0.15)",
+                                    "backgroundColor": "#f1f5f9",
                                     "fontWeight": "600",
+                                    "color": "#0f172a",
+                                    "border": "0px",
                                 },
                                 style_cell={
-                                    "backgroundColor": "rgba(255, 255, 255, 0.04)",
+                                    "backgroundColor": "#ffffff",
                                     "border": "0px",
-                                    "color": "#f1f5f9",
+                                    "color": "#1f2937",
                                     "fontFamily": "'Inter', 'Segoe UI', sans-serif",
                                 },
                                 style_data_conditional=[
                                     {
                                         "if": {"column_id": "column"},
-                                        "fontWeight": "500",
-                                        "color": "#cbd5f5",
+                                        "fontWeight": "600",
+                                        "color": "#0f172a",
                                     }
                                 ],
                             ),
@@ -404,18 +406,19 @@ def build_layout() -> html.Div:
                     "backgroundColor": "transparent",
                     "fontWeight": "600",
                     "textTransform": "uppercase",
+                    "color": "#0f172a",
                 },
                 style_cell={
-                    "backgroundColor": "rgba(255, 255, 255, 0.05)",
+                    "backgroundColor": "#ffffff",
                     "border": "0px",
-                    "color": "#f1f5f9",
+                    "color": "#1f2937",
                     "fontFamily": "'Inter', 'Segoe UI', sans-serif",
                     "padding": "12px",
                 },
                 style_data_conditional=[
                     {
                         "if": {"state": "selected"},
-                        "backgroundColor": "rgba(148, 163, 184, 0.25)",
+                        "backgroundColor": "rgba(14, 165, 233, 0.2)",
                         "border": "0px",
                     }
                 ],

@@ -24,52 +24,117 @@ def build_layout() -> html.Div:
                 [
                     html.Div(
                         [
-                            html.H3("Paso 1 · Directorio de trabajo", className="section-title"),
-                            html.P(
-                                "Seleccione la carpeta que contiene los archivos CSV generados por el sistema.",
-                                className="section-description",
+                            html.Div(
+                                [
+                                    html.Span("Paso 1", className="step-badge"),
+                                    html.Div(
+                                        [
+                                            html.H3(
+                                                "Directorio de trabajo",
+                                                className="section-title",
+                                            ),
+                                            html.P(
+                                                "Seleccione la carpeta que contiene los archivos CSV generados por el sistema y defina cada cuánto se actualizará la lectura.",
+                                                className="section-description",
+                                            ),
+                                        ],
+                                        className="panel-heading-text",
+                                    ),
+                                ],
+                                className="panel-heading",
                             ),
-                            html.Label("Directorio de datos"),
-                            dcc.Input(
-                                id="directory-input",
-                                type="text",
-                                value="",
-                                debounce=True,
-                                placeholder="Ej: C:/monitoreo/tirantes",
-                                style={"width": "100%"},
+                            html.Div(
+                                [
+                                    html.Label("Directorio de datos"),
+                                    dcc.Input(
+                                        id="directory-input",
+                                        type="text",
+                                        value="",
+                                        debounce=True,
+                                        placeholder="Ej: C:/monitoreo/tirantes",
+                                        style={"width": "100%"},
+                                    ),
+                                ],
+                                className="input-stack",
                             ),
-                            html.Button(
-                                "Seleccionar directorio",
-                                id="select-directory-button",
-                                className="directory-button",
-                                n_clicks=0,
-                            ),
-                            html.Br(),
-                            html.Label("Intervalo de actualización (s)"),
-                            dcc.Input(
-                                id="poll-seconds",
-                                type="number",
-                                min=5,
-                                max=300,
-                                step=5,
-                                value=30,
+                            html.Div(
+                                [
+                                    html.Button(
+                                        "Seleccionar directorio",
+                                        id="select-directory-button",
+                                        className="directory-button",
+                                        n_clicks=0,
+                                    ),
+                                    html.Div(
+                                        [
+                                            html.Label("Intervalo de actualización (s)"),
+                                            dcc.Input(
+                                                id="poll-seconds",
+                                                type="number",
+                                                min=5,
+                                                max=300,
+                                                step=5,
+                                                value=30,
+                                            ),
+                                        ],
+                                        className="control-inline",
+                                    ),
+                                ],
+                                className="panel-actions",
                             ),
                         ],
                         className="panel",
                     ),
                     html.Div(
                         [
-                            html.H3("Paso 2 · Mapeo y parámetros", className="section-title"),
-                            html.P(
-                                "Asigne un nombre a cada tirante, indique su frecuencia fundamental propuesta y el valor de Ke (Ton·s).",
-                                className="section-description",
+                            html.Div(
+                                [
+                                    html.Span("Paso 2", className="step-badge"),
+                                    html.Div(
+                                        [
+                                            html.H3(
+                                                "Mapeo y parámetros",
+                                                className="section-title",
+                                            ),
+                                            html.P(
+                                                "Asigne un nombre a cada tirante, indique su frecuencia fundamental propuesta y el valor de Ke (Ton·s).",
+                                                className="section-description",
+                                            ),
+                                        ],
+                                        className="panel-heading-text",
+                                    ),
+                                ],
+                                className="panel-heading",
                             ),
                             html.Label("Mapeo de sensores (JSON)"),
                             dcc.Textarea(
                                 id="map-textarea",
                                 value="{}",
-                                placeholder='{"canal_raw": "Tirante 1"}',
+                                placeholder='{"canal_raw": {"tirante": "Tirante 1", "f0": 1.2, "ke": 0.45}}',
                                 style={"width": "100%", "height": "140px"},
+                            ),
+                            html.Details(
+                                [
+                                    html.Summary("Ver ejemplo completo de mapeo"),
+                                    html.Div(
+                                        [
+                                            html.P(
+                                                "Puedes copiar y adaptar el siguiente formato para mapear múltiples sensores:",
+                                                className="section-description",
+                                            ),
+                                            html.Pre(
+                                                '{\n    "canal_x": {"tirante": "Tirante Norte", "f0": 1.35, "ke": 0.42},\n    "canal_y": {"tirante": "Tirante Sur", "f0": 1.18, "ke": 0.38},\n    "canal_z": {"tirante": "Tirante Central", "f0": 1.42, "ke": 0.47}\n}',
+                                                className="code-example",
+                                            ),
+                                            html.P(
+                                                "Cada clave representa el nombre de la columna en el archivo CSV y el valor define el tirante asociado junto a sus parámetros iniciales.",
+                                                className="info-note",
+                                            ),
+                                        ],
+                                        className="example-card",
+                                    ),
+                                ],
+                                className="example-details",
                             ),
                             html.Button(
                                 "Aplicar mapeo",
@@ -107,9 +172,9 @@ def build_layout() -> html.Div:
                                 data=[],
                                 editable=True,
                                 style_header={
-                                    "backgroundColor": "#f1f5f9",
+                                    "backgroundColor": "#eef2ff",
                                     "fontWeight": "600",
-                                    "color": "#0f172a",
+                                    "color": "#1e1b4b",
                                     "border": "0px",
                                 },
                                 style_cell={
@@ -122,7 +187,7 @@ def build_layout() -> html.Div:
                                     {
                                         "if": {"column_id": "column"},
                                         "fontWeight": "600",
-                                        "color": "#0f172a",
+                                        "color": "#1e1b4b",
                                     }
                                 ],
                             ),
@@ -137,10 +202,24 @@ def build_layout() -> html.Div:
                 [
                     html.Div(
                         [
-                            html.H3("Paso 3 · Análisis y visualización", className="section-title"),
-                            html.P(
-                                "Cuando se detecte un archivo nuevo se cargará automáticamente. Seleccione el tirante a visualizar.",
-                                className="section-description",
+                            html.Div(
+                                [
+                                    html.Span("Paso 3", className="step-badge"),
+                                    html.Div(
+                                        [
+                                            html.H3(
+                                                "Análisis y visualización",
+                                                className="section-title",
+                                            ),
+                                            html.P(
+                                                "Cuando se detecte un archivo nuevo se cargará automáticamente. Seleccione el tirante a visualizar.",
+                                                className="section-description",
+                                            ),
+                                        ],
+                                        className="panel-heading-text",
+                                    ),
+                                ],
+                                className="panel-heading",
                             ),
                             html.Label("Archivo en análisis"),
                             html.Div(
@@ -397,7 +476,7 @@ def build_layout() -> html.Div:
                 ],
                 className="graph-row",
             ),
-            html.H2("Resultados", className="section-title"),
+            html.H2("Resultados", className="section-title results-title"),
             DataTable(
                 id="results-table",
                 columns=[],

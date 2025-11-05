@@ -9,10 +9,11 @@ from typing import Any, Dict, Optional
 
 import pandas as pd
 import plotly.graph_objects as go
-from dash import Dash, Input, Output, State, no_update
+from dash import Dash, Input, Output, State, ctx, no_update
 from dash.exceptions import PreventUpdate
 
 from .analysis import analyse_signal, get_directory_files, load_and_prepare_data_from_file
+from .storage import save_mapping_text
 
 
 EMPTY_FIGURE = go.Figure()
@@ -83,6 +84,8 @@ def register_callbacks(app: Dash) -> None:
 
         if not sensor_map:
             return [], "Defina al menos un sensor en el mapeo.", None, ""
+
+        save_mapping_text(sensor_map)
 
         table_rows = []
         for original, alias in sensor_map.items():
@@ -178,27 +181,119 @@ def register_callbacks(app: Dash) -> None:
         Input("polling-interval", "n_intervals"),
         Input("directory-input", "value"),
         Input("sensor-config-store", "data"),
+        Input("processing-state", "data"),
         State("active-file-store", "data"),
     )
     def refresh_file_list(
         _: int,
         directory: str,
         config_data: Optional[Dict[str, Any]],
+        processing_state: Optional[str],
         active_file: Optional[str],
     ):
         config_complete = bool(config_data and config_data.get("complete"))
         if not directory or not config_complete:
             return [], None
 
+        triggered = ctx.triggered_id
+        if triggered == "polling-interval" and processing_state != "running":
+            raise PreventUpdate
+
         files = get_directory_files(directory or "")
         next_file = active_file if active_file in files else (files[0] if files else None)
+        if processing_state != "running":
+            next_file = None
         return files, next_file
 
     @app.callback(
-        Output("data-store", "data"),
+        Output("processing-state", "data"),
+        Output("polling-interval", "disabled"),
+        Output("processing-status", "children"),
+        Output("active-file-store", "data", allow_duplicate=True),
+        Output("data-store", "data", allow_duplicate=True),
+        Output("file-info", "children", allow_duplicate=True),
+        Input("start-processing", "n_clicks"),
+        Input("pause-processing", "n_clicks"),
+        Input("stop-processing", "n_clicks"),
+        State("processing-state", "data"),
+        State("sensor-config-store", "data"),
+        State("directory-input", "value"),
+        prevent_initial_call=True,
+    )
+    def control_processing(
+        start_clicks: Optional[int],
+        pause_clicks: Optional[int],
+        stop_clicks: Optional[int],
+        current_state: Optional[str],
+        config_data: Optional[Dict[str, Any]],
+        directory: Optional[str],
+    ):
+        trigger = ctx.triggered_id
+        if trigger is None:
+            raise PreventUpdate
+
+        current_state = current_state or "stopped"
+        config_complete = bool(config_data and config_data.get("complete"))
+
+        if trigger == "start-processing":
+            if not directory:
+                message = "Seleccione un directorio antes de iniciar."
+                return (
+                    current_state,
+                    True,
+                    message,
+                    no_update,
+                    no_update,
+                    message,
+                )
+            if not config_complete:
+                message = "Complete la configuración de los tirantes antes de iniciar."
+                return (
+                    current_state,
+                    True,
+                    message,
+                    no_update,
+                    no_update,
+                    message,
+                )
+
+            return (
+                "running",
+                False,
+                "Lectura y procesamiento en ejecución.",
+                no_update,
+                no_update,
+                "Buscando archivos nuevos...",
+            )
+
+        if trigger == "pause-processing":
+            status_message = "Lectura pausada. Presione Iniciar para reanudar."
+            return (
+                "paused",
+                True,
+                status_message,
+                no_update,
+                no_update,
+                no_update,
+            )
+
+        if trigger == "stop-processing":
+            return (
+                "stopped",
+                True,
+                "Lectura detenida. Presione Iniciar para comenzar.",
+                None,
+                None,
+                "Lectura detenida.",
+            )
+
+        raise PreventUpdate
+
+    @app.callback(
+        Output("data-store", "data", allow_duplicate=True),
         Output("sensor-dropdown", "options"),
         Output("sensor-dropdown", "value"),
-        Output("file-info", "children"),
+        Output("file-info", "children", allow_duplicate=True),
         Output("error-message", "children", allow_duplicate=True),
         Output("active-file-store", "data", allow_duplicate=True),
         Input("active-file-store", "data"),

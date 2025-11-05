@@ -321,13 +321,28 @@ def plot_stft(signal: np.ndarray, fs: float, *, sensor_name: Optional[str] = Non
     return fig
 
 
-def compute_tension(frequency: Optional[float], length_m: float, linear_density: float) -> Optional[float]:
+def compute_tension(
+    frequency: Optional[float],
+    length_m: Optional[float] = None,
+    linear_density: Optional[float] = None,
+    ke_ton_s: Optional[float] = None,
+) -> Optional[float]:
     """Estimate the cable tension given a fundamental frequency."""
 
     if frequency is None or frequency <= 0:
         return None
-    if length_m <= 0 or linear_density <= 0:
+
+    if ke_ton_s is not None and ke_ton_s > 0:
+        return ke_ton_s * frequency
+
+    if (
+        length_m is None
+        or linear_density is None
+        or length_m <= 0
+        or linear_density <= 0
+    ):
         return None
+
     return 4 * (length_m ** 2) * (frequency ** 2) * linear_density
 
 
@@ -365,8 +380,9 @@ def analyse_signal(
     use_hint: bool,
     f0_hint: Optional[float],
     tol_hz: Optional[float],
-    length_m: Optional[float],
-    linear_density: Optional[float],
+    length_m: Optional[float] = None,
+    linear_density: Optional[float] = None,
+    ke_ton_s: Optional[float] = None,
 ) -> Tuple[go.Figure, go.Figure, go.Figure, go.Figure, AnalysisResults, Tuple[float, float, float]]:
     """Run the full analysis pipeline for a selected sensor."""
 
@@ -463,7 +479,12 @@ def analyse_signal(
     stft_fig = plot_stft(signal_segment, fs_value, sensor_name=sensor)
 
     fundamental_used = f0_refined_hint if use_hint else f0_refined_auto
-    tension = compute_tension(fundamental_used, float(length_m or 0), float(linear_density or 0))
+    tension = compute_tension(
+        fundamental_used,
+        length_m=float(length_m) if length_m is not None else None,
+        linear_density=float(linear_density) if linear_density is not None else None,
+        ke_ton_s=float(ke_ton_s) if ke_ton_s is not None else None,
+    )
 
     results = AnalysisResults(
         fundamental=f0_auto,

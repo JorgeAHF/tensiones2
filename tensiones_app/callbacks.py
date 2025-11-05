@@ -189,7 +189,7 @@ def register_callbacks(app: Dash) -> None:
         directory: str,
         config_data: Optional[Dict[str, Any]],
         processing_state: Optional[str],
-        active_file: Optional[str],
+        active_file,
     ):
         config_complete = bool(config_data and config_data.get("complete"))
         if not directory or not config_complete:
@@ -199,8 +199,27 @@ def register_callbacks(app: Dash) -> None:
         if triggered == "polling-interval" and processing_state != "running":
             raise PreventUpdate
 
-        files = get_directory_files(directory or "")
-        next_file = active_file if active_file in files else (files[0] if files else None)
+        raw_files = get_directory_files(directory or "")
+        files = []
+        for path in raw_files:
+            try:
+                mtime = os.path.getmtime(path)
+            except OSError:
+                continue
+            files.append({"path": path, "name": os.path.basename(path), "mtime": mtime})
+
+        if isinstance(active_file, str):
+            active_metadata = next(
+                (item for item in files if item["path"] == active_file), None
+            )
+        elif isinstance(active_file, dict):
+            active_metadata = active_file
+        else:
+            active_metadata = None
+
+        next_file = (
+            active_metadata if active_metadata in files else (files[0] if files else None)
+        )
         if processing_state != "running":
             next_file = None
         return files, next_file
@@ -295,18 +314,24 @@ def register_callbacks(app: Dash) -> None:
         Output("sensor-dropdown", "value"),
         Output("file-info", "children", allow_duplicate=True),
         Output("error-message", "children", allow_duplicate=True),
-        Output("active-file-store", "data", allow_duplicate=True),
         Input("active-file-store", "data"),
         State("map-textarea", "value"),
         State("sensor-config-store", "data"),
         prevent_initial_call=True,
     )
     def load_file(
-        path: Optional[str],
+        path_info,
         mapping_text: Optional[str],
         config_data: Optional[Dict[str, Any]],
     ):
-        if not path:
+        if isinstance(path_info, str):
+            path = path_info
+        elif isinstance(path_info, dict):
+            path = path_info.get("path")
+        else:
+            raise PreventUpdate
+
+        if not isinstance(path, str) or not path:
             raise PreventUpdate
 
         if not config_data or not config_data.get("complete"):
@@ -316,23 +341,22 @@ def register_callbacks(app: Dash) -> None:
                 None,
                 "En espera de completar la configuración de los tirantes.",
                 "Complete la configuración de los tirantes antes de continuar.",
-                None,
             )
 
         try:
             sensor_map: Dict[str, str] = json.loads(mapping_text or "{}")
         except json.JSONDecodeError as exc:
-            return None, [], None, "", f"Error en mapeo JSON: {exc}", None
+            return None, [], None, "", f"Error en mapeo JSON: {exc}"
 
         try:
             df = load_and_prepare_data_from_file(path, sensor_map)
         except Exception as exc:  # pylint: disable=broad-except
-            return None, [], None, "", f"Error al leer archivo: {exc}", None
+            return None, [], None, "", f"Error al leer archivo: {exc}"
 
         by_sensor: Dict[str, Dict[str, Any]] = config_data.get("by_sensor", {})
         sensors = [col for col in df.columns if col in by_sensor]
         if not sensors:
-            return None, [], None, "", "El archivo no contiene tirantes configurados.", None
+            return None, [], None, "", "El archivo no contiene tirantes configurados."
 
         store_data = {"df": df.to_json(orient="split")}
         sensor_options = [{"label": col, "value": col} for col in sensors]
@@ -356,7 +380,7 @@ def register_callbacks(app: Dash) -> None:
                 f"Movido a 'procesados/{os.path.basename(destination)}'."
             )
 
-        return store_data, sensor_options, sensor_value, info, "", None
+        return store_data, sensor_options, sensor_value, info, ""
 
     @app.callback(
         Output("accelerogram-full", "figure"),

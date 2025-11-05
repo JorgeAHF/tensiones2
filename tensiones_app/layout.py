@@ -63,6 +63,10 @@ def build_layout() -> html.Div:
                     html.Div(
                         [
                             html.H3("Parámetros de análisis", className="section-title"),
+                            html.P(
+                                "Ajusta finamente la forma en que se procesa la señal para detectar la frecuencia fundamental con mayor confianza.",
+                                className="section-description section-intro",
+                            ),
                             html.Div(
                                 [
                                     html.Div(
@@ -206,53 +210,103 @@ def build_layout() -> html.Div:
                                                 max=100,
                                                 step=0.1,
                                                 value=[0, 100],
+                                                className="range-slider",
                                             ),
                                             html.Div(id="pct-label", className="info"),
                                         ],
                                         className="parameter-section",
                                     ),
+                                    html.Div(
+                                        [
+                                            html.H4("Ayuda basada en conocimiento", className="subsection-title"),
+                                            html.P(
+                                                "Utiliza una estimación previa de f₀ para guiar la detección automática y restringir el rango de búsqueda.",
+                                                className="section-description",
+                                            ),
+                                            html.Div(
+                                                [
+                                                    dcc.Checklist(
+                                                        options=[{"label": "Usar f₀ propuesta", "value": "use"}],
+                                                        value=[],
+                                                        id="use-f0-hint",
+                                                        className="toggle-input",
+                                                    ),
+                                                    html.Div(
+                                                        [
+                                                            html.Label("f₀ propuesta (Hz)"),
+                                                            dcc.Input(
+                                                                id="f0-hint-input",
+                                                                type="number",
+                                                                min=0.0,
+                                                                step=0.01,
+                                                                value=2.0,
+                                                            ),
+                                                        ],
+                                                        className="control-item",
+                                                    ),
+                                                    html.Div(
+                                                        [
+                                                            html.Label("Tol ± (Hz)"),
+                                                            dcc.Input(
+                                                                id="tol-input",
+                                                                type="number",
+                                                                min=0.01,
+                                                                max=5.0,
+                                                                step=0.01,
+                                                                value=0.15,
+                                                            ),
+                                                        ],
+                                                        className="control-item",
+                                                    ),
+                                                ],
+                                                className="control-grid",
+                                            ),
+                                        ],
+                                        className="parameter-section",
+                                    ),
+                                    html.Div(
+                                        [
+                                            html.H4("Cálculo de tensión", className="subsection-title"),
+                                            html.P(
+                                                "Define las propiedades físicas del tirante para estimar la tensión correspondiente a la frecuencia fundamental.",
+                                                className="section-description",
+                                            ),
+                                            html.Div(
+                                                [
+                                                    html.Div(
+                                                        [
+                                                            html.Label("Longitud (m)"),
+                                                            dcc.Input(
+                                                                id="length-input",
+                                                                type="number",
+                                                                min=0.0,
+                                                                step=0.1,
+                                                                value=1.0,
+                                                            ),
+                                                        ],
+                                                        className="control-item",
+                                                    ),
+                                                    html.Div(
+                                                        [
+                                                            html.Label("Masa lineal (kg/m)"),
+                                                            dcc.Input(
+                                                                id="density-input",
+                                                                type="number",
+                                                                min=0.0,
+                                                                step=0.01,
+                                                                value=0.5,
+                                                            ),
+                                                        ],
+                                                        className="control-item",
+                                                    ),
+                                                ],
+                                                className="control-grid",
+                                            ),
+                                        ],
+                                        className="parameter-section",
+                                    ),
                                 ],
                                 className="parameter-stack",
-                            ),
-                            html.H3("f₀ propuesta", className="section-title"),
-                            dcc.Checklist(
-                                options=[{"label": "Usar f₀ propuesta", "value": "use"}],
-                                value=[],
-                                id="use-f0-hint",
-                            ),
-                            html.Label("f₀ propuesta (Hz)"),
-                            dcc.Input(
-                                id="f0-hint-input",
-                                type="number",
-                                min=0.0,
-                                step=0.01,
-                                value=2.0,
-                            ),
-                            html.Label("Tol ± (Hz)"),
-                            dcc.Input(
-                                id="tol-input",
-                                type="number",
-                                min=0.01,
-                                max=5.0,
-                                step=0.01,
-                                value=0.15,
-                            ),
-                            html.H3("Cálculo de tensión", className="section-title"),
-                            html.Label("Longitud (m)"),
-                            dcc.Input(
-                                id="length-input",
-                                type="number",
-                                min=0.0,
-                                step=0.1,
-                                value=1.0,
-                            ),
-                            html.Label("Masa lineal (kg/m)"),
-                            dcc.Input(
-                                id="density-input",
-                                type="number",
-                                min=0.0,
-                                step=0.01,
-                                value=0.5,
                             ),
                         ],
                         className="panel",

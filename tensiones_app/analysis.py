@@ -215,6 +215,8 @@ def plot_psd(
     threshold: Optional[float],
     f0_hint: Optional[float],
     harmonics_from_hint: Iterable[float],
+    *,
+    sensor_name: Optional[str] = None,
 ) -> go.Figure:
     """Plot the PSD along with the identified peaks and thresholds."""
 
@@ -274,8 +276,12 @@ def plot_psd(
             )
         )
 
+    title = "Espectro de potencia"
+    if sensor_name:
+        title = f"{title} – {sensor_name}"
+
     fig.update_layout(
-        title="PSD",
+        title=title,
         xaxis_title="Frecuencia [Hz]",
         yaxis_title="PSD [g²/Hz]",
         yaxis=dict(type="log", tickformat=".2e"),
@@ -284,7 +290,7 @@ def plot_psd(
     return fig
 
 
-def plot_stft(signal: np.ndarray, fs: float) -> go.Figure:
+def plot_stft(signal: np.ndarray, fs: float, *, sensor_name: Optional[str] = None) -> go.Figure:
     """Return an STFT heatmap of the selected signal segment."""
 
     f, t, sxx = spectrogram(signal, fs, nperseg=1024, noverlap=512)
@@ -301,8 +307,12 @@ def plot_stft(signal: np.ndarray, fs: float) -> go.Figure:
         colorbar=dict(title="dB"),
     )
     fig = go.Figure(data=heatmap)
+    title = "Espectrograma (STFT)"
+    if sensor_name:
+        title = f"{title} – {sensor_name}"
+
     fig.update_layout(
-        title="STFT",
+        title=title,
         xaxis_title="Tiempo [s]",
         yaxis_title="Frecuencia [Hz]",
         yaxis_range=[0, 50],
@@ -445,11 +455,12 @@ def analyse_signal(
         threshold=threshold_value,
         f0_hint=f0_refined_hint if use_hint else None,
         harmonics_from_hint=harmonics_from_hint if use_hint else [],
+        sensor_name=sensor,
     )
 
     accel_full_fig = plot_accelerogram(signal_full, fs_value, sensor, start_s, end_s)
     accel_segment_fig = plot_segment(signal_segment, fs_value, sensor)
-    stft_fig = plot_stft(signal_segment, fs_value)
+    stft_fig = plot_stft(signal_segment, fs_value, sensor_name=sensor)
 
     fundamental_used = f0_refined_hint if use_hint else f0_refined_auto
     tension = compute_tension(fundamental_used, float(length_m or 0), float(linear_density or 0))

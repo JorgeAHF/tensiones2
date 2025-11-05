@@ -51,7 +51,7 @@ def register_callbacks(app: Dash) -> None:
         Output("sensor-dropdown", "options"),
         Output("sensor-dropdown", "value"),
         Output("file-info", "children"),
-        Output("error-message", "children"),
+        Output("error-message", "children", allow_duplicate=True),
         Input("file-dropdown", "value"),
         Input("map-textarea", "value"),
     )

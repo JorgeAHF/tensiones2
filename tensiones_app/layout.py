@@ -1,0 +1,202 @@
+"""Dash layout factory."""
+from __future__ import annotations
+
+from dash import dcc, html
+from dash.dash_table import DataTable
+
+
+def build_layout() -> html.Div:
+    """Return the root layout for the application."""
+
+    return html.Div(
+        [
+            html.H1("Monitor automático de tensión"),
+            html.Div(
+                [
+                    html.Div(
+                        [
+                            html.H3("Configuración"),
+                            html.Label("Directorio de datos"),
+                            dcc.Input(
+                                id="directory-input",
+                                type="text",
+                                value="./data",
+                                debounce=True,
+                                style={"width": "100%"},
+                            ),
+                            html.Br(),
+                            html.Label("Intervalo de actualización (s)"),
+                            dcc.Input(
+                                id="poll-seconds",
+                                type="number",
+                                min=5,
+                                max=300,
+                                step=5,
+                                value=30,
+                            ),
+                            html.Br(),
+                            html.Label("Mapeo de sensores (JSON)"),
+                            dcc.Textarea(
+                                id="map-textarea",
+                                value="{}",
+                                style={"width": "100%", "height": "120px"},
+                            ),
+                            html.Br(),
+                            html.Label("Archivo seleccionado"),
+                            dcc.Dropdown(id="file-dropdown"),
+                            html.Div(id="file-info", className="info"),
+                            html.Br(),
+                            html.Label("Tirante"),
+                            dcc.Dropdown(id="sensor-dropdown"),
+                        ],
+                        className="panel",
+                    ),
+                    html.Div(
+                        [
+                            html.H3("Parámetros de análisis"),
+                            html.Div(
+                                [
+                                    html.Label("Fs (Hz)"),
+                                    dcc.Input(
+                                        id="fs-input",
+                                        type="number",
+                                        min=10,
+                                        max=2000,
+                                        step=1,
+                                        value=128,
+                                    ),
+                                    html.Label("nperseg"),
+                                    dcc.Input(
+                                        id="nperseg-input",
+                                        type="number",
+                                        min=256,
+                                        max=16384,
+                                        step=256,
+                                        value=4096,
+                                    ),
+                                    html.Label("noverlap"),
+                                    dcc.Input(
+                                        id="noverlap-input",
+                                        type="number",
+                                        min=0,
+                                        max=16384,
+                                        step=256,
+                                        value=2048,
+                                    ),
+                                    html.Label("Suavizado σ"),
+                                    dcc.Input(
+                                        id="sigma-input",
+                                        type="number",
+                                        min=0.1,
+                                        max=10.0,
+                                        step=0.1,
+                                        value=0.6,
+                                    ),
+                                    html.Label("Threshold"),
+                                    dcc.Input(
+                                        id="threshold-input",
+                                        type="number",
+                                        min=1e-12,
+                                        max=1e-3,
+                                        step=1e-7,
+                                        value=2.5e-7,
+                                    ),
+                                    html.Label("Min distancia (Hz)"),
+                                    dcc.Input(
+                                        id="min-distance-input",
+                                        type="number",
+                                        min=0.1,
+                                        max=10.0,
+                                        step=0.1,
+                                        value=0.3,
+                                    ),
+                                    html.Label("N° Armónicos"),
+                                    dcc.Input(
+                                        id="harmonics-input",
+                                        type="number",
+                                        min=1,
+                                        max=5,
+                                        step=1,
+                                        value=2,
+                                    ),
+                                    html.Label("Rango del archivo (%)"),
+                                    dcc.RangeSlider(
+                                        id="pct-range",
+                                        min=0,
+                                        max=100,
+                                        step=0.1,
+                                        value=[0, 100],
+                                    ),
+                                    html.Div(id="pct-label", className="info"),
+                                ],
+                                className="grid",
+                            ),
+                            html.H3("f₀ propuesta"),
+                            dcc.Checklist(
+                                options=[{"label": "Usar f₀ propuesta", "value": "use"}],
+                                value=[],
+                                id="use-f0-hint",
+                            ),
+                            html.Label("f₀ propuesta (Hz)"),
+                            dcc.Input(
+                                id="f0-hint-input",
+                                type="number",
+                                min=0.0,
+                                step=0.01,
+                                value=2.0,
+                            ),
+                            html.Label("Tol ± (Hz)"),
+                            dcc.Input(
+                                id="tol-input",
+                                type="number",
+                                min=0.01,
+                                max=5.0,
+                                step=0.01,
+                                value=0.15,
+                            ),
+                            html.H3("Cálculo de tensión"),
+                            html.Label("Longitud (m)"),
+                            dcc.Input(
+                                id="length-input",
+                                type="number",
+                                min=0.0,
+                                step=0.1,
+                                value=1.0,
+                            ),
+                            html.Label("Masa lineal (kg/m)"),
+                            dcc.Input(
+                                id="density-input",
+                                type="number",
+                                min=0.0,
+                                step=0.01,
+                                value=0.5,
+                            ),
+                        ],
+                        className="panel",
+                    ),
+                ],
+                className="layout",
+            ),
+            html.Hr(),
+            html.Div(
+                [
+                    dcc.Graph(id="accelerogram-full"),
+                    dcc.Graph(id="accelerogram-segment"),
+                ],
+                className="graph-row",
+            ),
+            html.Div(
+                [
+                    dcc.Graph(id="psd-graph"),
+                    dcc.Graph(id="stft-graph"),
+                ],
+                className="graph-row",
+            ),
+            html.H2("Resultados"),
+            DataTable(id="results-table", columns=[], data=[]),
+            dcc.Interval(id="polling-interval", interval=30000, n_intervals=0),
+            dcc.Store(id="data-store"),
+            dcc.Store(id="files-store"),
+            html.Div(id="error-message", className="error"),
+        ]
+    )

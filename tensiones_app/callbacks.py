@@ -54,6 +54,7 @@ def register_callbacks(app: Dash) -> None:
         Output("error-message", "children", allow_duplicate=True),
         Input("file-dropdown", "value"),
         Input("map-textarea", "value"),
+        prevent_initial_call="initial_duplicate",
     )
     def load_file(path: Optional[str], mapping_text: str):
         if not path:
@@ -100,7 +101,7 @@ def register_callbacks(app: Dash) -> None:
         Input("tol-input", "value"),
         Input("length-input", "value"),
         Input("density-input", "value"),
-        prevent_initial_call=True,
+        prevent_initial_call="initial_duplicate",
     )
     def update_analysis(
         store_data: Optional[Dict[str, Any]],

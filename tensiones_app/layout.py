@@ -59,9 +59,9 @@ def build_layout() -> html.Div:
                     ),
                     html.Div(
                         [
-                            html.H3("Paso 2 · Mapeo de sensores", className="section-title"),
+                            html.H3("Paso 2 · Mapeo y parámetros", className="section-title"),
                             html.P(
-                                "Indique cómo se deben renombrar las columnas de los archivos para cada tirante.",
+                                "Asigne un nombre a cada tirante, indique su frecuencia fundamental propuesta y el valor de Ke (Ton·s).",
                                 className="section-description",
                             ),
                             html.Label("Mapeo de sensores (JSON)"),
@@ -78,21 +78,6 @@ def build_layout() -> html.Div:
                                 n_clicks=0,
                             ),
                             html.Div(id="mapping-status", className="info"),
-                        ],
-                        className="panel",
-                    ),
-                ],
-                className="layout",
-            ),
-            html.Div(
-                [
-                    html.Div(
-                        [
-                            html.H3("Paso 3 · Parámetros por tirante", className="section-title"),
-                            html.P(
-                                "Complete la frecuencia fundamental inicial y las propiedades físicas de cada tirante.",
-                                className="section-description",
-                            ),
                             DataTable(
                                 id="sensor-config-table",
                                 columns=[
@@ -107,20 +92,14 @@ def build_layout() -> html.Div:
                                         "editable": True,
                                     },
                                     {
-                                        "name": "f₀ inicial (Hz)",
+                                        "name": "f₀ propuesta (Hz)",
                                         "id": "f0",
                                         "type": "numeric",
                                         "editable": True,
                                     },
                                     {
-                                        "name": "Longitud (m)",
-                                        "id": "length",
-                                        "type": "numeric",
-                                        "editable": True,
-                                    },
-                                    {
-                                        "name": "Masa lineal (kg/m)",
-                                        "id": "density",
+                                        "name": "Ke (Ton·s)",
+                                        "id": "ke",
                                         "type": "numeric",
                                         "editable": True,
                                     },
@@ -149,20 +128,24 @@ def build_layout() -> html.Div:
                         ],
                         className="panel",
                     ),
+                ],
+                className="layout",
+            ),
+            html.Div(
+                [
                     html.Div(
                         [
-                            html.H3("Paso 4 · Selección y análisis", className="section-title"),
+                            html.H3("Paso 3 · Análisis y visualización", className="section-title"),
                             html.P(
-                                "Una vez completados los pasos anteriores, seleccione el archivo y el tirante a analizar.",
+                                "Cuando se detecte un archivo nuevo se cargará automáticamente. Seleccione el tirante a visualizar.",
                                 className="section-description",
                             ),
-                            html.Label("Archivo seleccionado"),
-                            dcc.Dropdown(
-                                id="file-dropdown",
-                                placeholder="Seleccione un archivo",
-                                disabled=True,
+                            html.Label("Archivo en análisis"),
+                            html.Div(
+                                "En espera de archivos nuevos.",
+                                id="file-info",
+                                className="info",
                             ),
-                            html.Div(id="file-info", className="info"),
                             html.Br(),
                             html.Label("Tirante"),
                             dcc.Dropdown(
@@ -441,6 +424,7 @@ def build_layout() -> html.Div:
             dcc.Store(id="data-store"),
             dcc.Store(id="files-store"),
             dcc.Store(id="sensor-config-store"),
+            dcc.Store(id="active-file-store"),
             html.Div(id="error-message", className="error"),
         ],
         className="app-container",

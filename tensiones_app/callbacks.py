@@ -84,15 +84,25 @@ def register_callbacks(app: Dash) -> None:
         if not sensor_map:
             return [], "Defina al menos un sensor en el mapeo.", None, ""
 
-        table_rows = [
-            {
-                "column": original,
-                "tirante": (alias or original),
-                "f0": None,
-                "ke": None,
-            }
-            for original, alias in sensor_map.items()
-        ]
+        table_rows = []
+        for original, alias in sensor_map.items():
+            if isinstance(alias, dict):
+                tirante_value = alias.get("tirante") or original
+                f0_value = alias.get("f0")
+                ke_value = alias.get("ke")
+            else:
+                tirante_value = alias or original
+                f0_value = None
+                ke_value = None
+
+            table_rows.append(
+                {
+                    "column": original,
+                    "tirante": tirante_value,
+                    "f0": f0_value,
+                    "ke": ke_value,
+                }
+            )
 
         mapping_message = (
             f"Mapeo aplicado para {len(table_rows)} tirantes. Complete f₀ y Ke para continuar."

@@ -271,6 +271,7 @@ def register_callbacks(app: Dash) -> None:
         Input("sensor-config-store", "data"),
         Input("processing-state", "data"),
         State("active-file-store", "data"),
+        prevent_initial_call=True,
     )
     def refresh_file_list(
         _: int,

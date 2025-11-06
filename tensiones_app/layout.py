@@ -346,9 +346,21 @@ def build_layout() -> html.Div:
                                 className="panel-actions",
                             ),
                             html.Div(
-                                "Lectura detenida. Presione Iniciar para comenzar.",
-                                id="processing-status",
-                                className="info",
+                                [
+                                    html.Div(
+                                        "Lectura detenida. Presione Iniciar para comenzar.",
+                                        id="processing-status",
+                                        className="info",
+                                    ),
+                                    html.Progress(
+                                        id="processing-progress",
+                                        max=100,
+                                        value=0,
+                                        className="processing-progress",
+                                        title="Sin actividad registrada",
+                                    ),
+                                ],
+                                className="processing-status-container",
                             ),
                             html.Br(),
                             html.Label("Tirante"),
@@ -358,6 +370,19 @@ def build_layout() -> html.Div:
                                 disabled=True,
                             ),
                             html.Div(id="selected-sensor-summary", className="info"),
+                            html.Div(
+                                [
+                                    html.H4(
+                                        "Historial de archivos procesados",
+                                        className="subsection-title",
+                                    ),
+                                    html.Ul(
+                                        id="processed-history-list",
+                                        className="history-list",
+                                    ),
+                                ],
+                                className="history-panel",
+                            ),
                         ],
                         className="panel",
                     ),
@@ -633,6 +658,8 @@ def build_layout() -> html.Div:
             dcc.Store(id="sensor-config-store", data=sensor_store_data),
             dcc.Store(id="active-file-store"),
             dcc.Store(id="processing-state", data="stopped"),
+            dcc.Store(id="processing-metadata-store"),
+            dcc.Store(id="processed-history-store", data=[]),
             dcc.Store(
                 id="directory-browser-store",
                 data={"path": os.getcwd()},

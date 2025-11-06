@@ -9,7 +9,7 @@ from typing import Any, Dict, Optional
 
 import pandas as pd
 import plotly.graph_objects as go
-from dash import Dash, Input, Output, State, ctx, no_update
+from dash import Dash, Input, Output, State, ctx, html, no_update
 from dash.exceptions import PreventUpdate
 
 from .analysis import analyse_signal, get_directory_files, load_and_prepare_data_from_file
@@ -264,6 +264,8 @@ def register_callbacks(app: Dash) -> None:
     @app.callback(
         Output("files-store", "data"),
         Output("active-file-store", "data"),
+        Output("processing-status", "children", allow_duplicate=True),
+        Output("processing-metadata-store", "data", allow_duplicate=True),
         Input("polling-interval", "n_intervals"),
         Input("directory-input", "value"),
         Input("sensor-config-store", "data"),
@@ -279,7 +281,17 @@ def register_callbacks(app: Dash) -> None:
     ):
         config_complete = bool(config_data and config_data.get("complete"))
         if not directory or not config_complete:
-            return [], None
+            status_message = (
+                "Defina una carpeta de trabajo y complete la configuración de los tirantes"
+                " para comenzar a monitorear."
+            )
+            metadata_payload = {
+                "pending": 0,
+                "active": None,
+                "last_poll": None,
+                "last_poll_display": None,
+            }
+            return [], None, status_message, metadata_payload
 
         triggered = ctx.triggered_id
         if triggered == "polling-interval" and processing_state != "running":
@@ -303,12 +315,42 @@ def register_callbacks(app: Dash) -> None:
         else:
             active_metadata = None
 
-        next_file = (
+        candidate_file = (
             active_metadata if active_metadata in files else (files[0] if files else None)
         )
-        if processing_state != "running":
-            next_file = None
-        return files, next_file
+        next_file = candidate_file if processing_state == "running" else None
+
+        now = datetime.now()
+        poll_display = now.strftime("%H:%M:%S")
+        pending_count = len(files)
+        metadata_payload = {
+            "pending": pending_count,
+            "active": (candidate_file or {}).get("name"),
+            "last_poll": now.isoformat(),
+            "last_poll_display": poll_display,
+        }
+
+        base_status = {
+            "running": "Lectura en ejecución.",
+            "paused": "Lectura pausada.",
+            "stopped": "Lectura detenida.",
+        }.get(processing_state or "stopped", "Lectura detenida.")
+
+        status_parts = []
+        if pending_count:
+            status_parts.append(f"{pending_count} archivo(s) pendientes")
+        else:
+            status_parts.append("Sin archivos pendientes")
+
+        candidate_name = (candidate_file or {}).get("name")
+        if candidate_name:
+            status_parts.append(f"Próximo archivo: {candidate_name}")
+
+        status_parts.append(f"Último sondeo: {poll_display}")
+
+        status_message = f"{base_status} {' · '.join(status_parts)}"
+
+        return files, next_file, status_message, metadata_payload
 
     @app.callback(
         Output("processing-state", "data"),
@@ -317,12 +359,14 @@ def register_callbacks(app: Dash) -> None:
         Output("active-file-store", "data", allow_duplicate=True),
         Output("data-store", "data", allow_duplicate=True),
         Output("file-info", "children", allow_duplicate=True),
+        Output("processing-metadata-store", "data", allow_duplicate=True),
         Input("start-processing", "n_clicks"),
         Input("pause-processing", "n_clicks"),
         Input("stop-processing", "n_clicks"),
         State("processing-state", "data"),
         State("sensor-config-store", "data"),
         State("directory-input", "value"),
+        State("processing-metadata-store", "data"),
         prevent_initial_call=True,
     )
     def control_processing(
@@ -332,6 +376,7 @@ def register_callbacks(app: Dash) -> None:
         current_state: Optional[str],
         config_data: Optional[Dict[str, Any]],
         directory: Optional[str],
+        metadata_state: Optional[Dict[str, Any]],
     ):
         trigger = ctx.triggered_id
         if trigger is None:
@@ -339,6 +384,20 @@ def register_callbacks(app: Dash) -> None:
 
         current_state = current_state or "stopped"
         config_complete = bool(config_data and config_data.get("complete"))
+
+        metadata_state = metadata_state or {}
+
+        def _metadata_suffix() -> str:
+            pending = metadata_state.get("pending")
+            last_poll_display = metadata_state.get("last_poll_display")
+            pieces = []
+            if pending is not None:
+                pieces.append(f"Pendientes: {pending}")
+            if metadata_state.get("active"):
+                pieces.append(f"Próximo archivo: {metadata_state['active']}")
+            if last_poll_display:
+                pieces.append(f"Último sondeo: {last_poll_display}")
+            return " · ".join(pieces)
 
         if trigger == "start-processing":
             if not directory:
@@ -350,6 +409,7 @@ def register_callbacks(app: Dash) -> None:
                     no_update,
                     no_update,
                     message,
+                    no_update,
                 )
             if not config_complete:
                 message = "Complete la configuración de los tirantes antes de iniciar."
@@ -360,19 +420,29 @@ def register_callbacks(app: Dash) -> None:
                     no_update,
                     no_update,
                     message,
+                    no_update,
                 )
 
+            suffix = _metadata_suffix()
+            status_message = "Lectura en ejecución."
+            if suffix:
+                status_message = f"{status_message} {suffix}"
+            info_message = "Buscando archivos nuevos en la carpeta seleccionada."
             return (
                 "running",
                 False,
-                "Lectura y procesamiento en ejecución.",
+                status_message,
                 no_update,
                 no_update,
-                "Buscando archivos nuevos...",
+                info_message,
+                no_update,
             )
 
         if trigger == "pause-processing":
+            suffix = _metadata_suffix()
             status_message = "Lectura pausada. Presione Iniciar para reanudar."
+            if suffix:
+                status_message = f"{status_message} {suffix}"
             return (
                 "paused",
                 True,
@@ -380,16 +450,22 @@ def register_callbacks(app: Dash) -> None:
                 no_update,
                 no_update,
                 no_update,
+                no_update,
             )
 
         if trigger == "stop-processing":
+            suffix = _metadata_suffix()
+            status_message = "Lectura detenida. Presione Iniciar para comenzar."
+            if suffix:
+                status_message = f"{status_message} {suffix}"
             return (
                 "stopped",
                 True,
-                "Lectura detenida. Presione Iniciar para comenzar.",
+                status_message,
                 None,
                 None,
                 "Lectura detenida. Seleccione una carpeta cuando desee reanudar.",
+                None,
             )
 
         raise PreventUpdate
@@ -400,15 +476,18 @@ def register_callbacks(app: Dash) -> None:
         Output("sensor-dropdown", "value"),
         Output("file-info", "children", allow_duplicate=True),
         Output("error-message", "children", allow_duplicate=True),
+        Output("processed-history-store", "data", allow_duplicate=True),
         Input("active-file-store", "data"),
         State("map-textarea", "value"),
         State("sensor-config-store", "data"),
+        State("processed-history-store", "data"),
         prevent_initial_call=True,
     )
     def load_file(
         path_info,
         mapping_text: Optional[str],
         config_data: Optional[Dict[str, Any]],
+        history_state,
     ):
         if isinstance(path_info, str):
             path = path_info
@@ -427,22 +506,32 @@ def register_callbacks(app: Dash) -> None:
                 None,
                 "En espera de completar la configuración de los tirantes.",
                 "Complete la configuración de los tirantes antes de continuar.",
+                no_update,
             )
 
         try:
             sensor_map: Dict[str, str] = json.loads(mapping_text or "{}")
         except json.JSONDecodeError as exc:
-            return None, [], None, "", f"Error en mapeo JSON: {exc}"
+            return None, [], None, "", f"Error en mapeo JSON: {exc}", no_update
 
         try:
             df = load_and_prepare_data_from_file(path, sensor_map)
         except Exception as exc:  # pylint: disable=broad-except
-            return None, [], None, "", f"Error al leer archivo: {exc}"
+            return None, [], None, "", f"Error al leer archivo: {exc}", no_update
 
         by_sensor: Dict[str, Dict[str, Any]] = config_data.get("by_sensor", {})
         sensors = [col for col in df.columns if col in by_sensor]
         if not sensors:
-            return None, [], None, "", "El archivo no contiene tirantes configurados."
+            return (
+                None,
+                [],
+                None,
+                "",
+                "El archivo no contiene tirantes configurados.",
+                no_update,
+            )
+        timestamp = datetime.now()
+        timestamp_display = timestamp.strftime("%Y-%m-%d %H:%M:%S")
 
         store_data = {"df": df.to_json(orient="split")}
         sensor_options = [{"label": col, "value": col} for col in sensors]
@@ -453,20 +542,36 @@ def register_callbacks(app: Dash) -> None:
         destination = os.path.join(processed_dir, os.path.basename(path))
         if os.path.exists(destination):
             base, ext = os.path.splitext(os.path.basename(path))
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            destination = os.path.join(processed_dir, f"{base}_{timestamp}{ext}")
+            timestamp_suffix = datetime.now().strftime("%Y%m%d_%H%M%S")
+            destination = os.path.join(processed_dir, f"{base}_{timestamp_suffix}{ext}")
 
         try:
             shutil.move(path, destination)
         except Exception as exc:  # pylint: disable=broad-except
             info = f"Archivo: {os.path.basename(path)}. Total de muestras: {len(df)}. No se pudo mover el archivo: {exc}"
+            status_note = f"Procesado con alertas · {timestamp_display}"
         else:
             info = (
                 f"Archivo: {os.path.basename(path)}. Total de muestras: {len(df)}. "
                 f"Movido a 'procesados/{os.path.basename(destination)}'."
             )
+            status_note = f"Procesado correctamente · {timestamp_display}"
 
-        return store_data, sensor_options, sensor_value, info, ""
+        history_list: list[dict[str, Any]] = []
+        if isinstance(history_state, list):
+            history_list = [entry for entry in history_state if isinstance(entry, dict)]
+
+        history_entry = {
+            "name": os.path.basename(path),
+            "processed_at": timestamp.isoformat(),
+            "processed_at_display": timestamp_display,
+            "note": info,
+            "status": status_note,
+        }
+        history_list.insert(0, history_entry)
+        history_list = history_list[:10]
+
+        return store_data, sensor_options, sensor_value, info, "", history_list
 
     @app.callback(
         Output("accelerogram-full", "figure"),
@@ -632,3 +737,82 @@ def register_callbacks(app: Dash) -> None:
         if ke_value:
             details.append(f"Ke: {ke_value:.3f} Ton·s")
         return " · ".join(details) if details else ""
+
+    @app.callback(
+        Output("processed-history-list", "children"),
+        Input("processed-history-store", "data"),
+    )
+    def render_processed_history(history_data):
+        if not history_data:
+            return [
+                html.Li(
+                    "Aún no se han procesado archivos.",
+                    className="history-item history-empty",
+                )
+            ]
+
+        items = []
+        for entry in history_data:
+            if not isinstance(entry, dict):
+                continue
+            name = entry.get("name", "Archivo desconocido")
+            processed_at = entry.get("processed_at_display") or entry.get(
+                "processed_at"
+            )
+            status = entry.get("status")
+            note = entry.get("note")
+            items.append(
+                html.Li(
+                    [
+                        html.Span(name, className="history-name"),
+                        html.Span(processed_at or "", className="history-timestamp"),
+                        html.Span(status or "", className="history-status"),
+                        html.Span(note or "", className="history-note"),
+                    ],
+                    className="history-item",
+                )
+            )
+
+        return items or [
+            html.Li(
+                "No hay registros disponibles.",
+                className="history-item history-empty",
+            )
+        ]
+
+    @app.callback(
+        Output("processing-progress", "value"),
+        Output("processing-progress", "max"),
+        Output("processing-progress", "title"),
+        Input("processing-state", "data"),
+        State("processing-metadata-store", "data"),
+    )
+    def update_processing_indicator(
+        processing_state: Optional[str], metadata: Optional[Dict[str, Any]]
+    ):
+        metadata = metadata or {}
+        state = processing_state or "stopped"
+
+        if state == "running":
+            value = 100
+        elif state == "paused":
+            value = 50
+        else:
+            value = 0
+
+        pending = metadata.get("pending")
+        next_name = metadata.get("active")
+        last_poll_display = metadata.get("last_poll_display")
+
+        title_parts = []
+        if pending is not None:
+            title_parts.append(f"Pendientes: {pending}")
+        if next_name:
+            title_parts.append(f"Próximo: {next_name}")
+        if last_poll_display:
+            title_parts.append(f"Último sondeo: {last_poll_display}")
+
+        if not title_parts:
+            title_parts.append("Sin actividad registrada")
+
+        return value, 100, " · ".join(title_parts)

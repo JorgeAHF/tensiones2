@@ -1,6 +1,8 @@
 """Dash layout factory."""
 from __future__ import annotations
 
+import os
+
 from dash import dcc, html
 from dash.dash_table import DataTable
 
@@ -61,11 +63,29 @@ def build_layout() -> html.Div:
                             ),
                             html.Div(
                                 [
-                                    html.Button(
-                                        "Seleccionar directorio",
-                                        id="select-directory-button",
-                                        className="directory-button",
-                                        n_clicks=0,
+                                    html.Div(
+                                        [
+                                            html.Label("Explorar subcarpetas"),
+                                            html.Div(
+                                                "Ninguna carpeta seleccionada.",
+                                                id="directory-browser-breadcrumb",
+                                                className="info",
+                                            ),
+                                            dcc.Dropdown(
+                                                id="directory-browser-dropdown",
+                                                options=[],
+                                                placeholder="Seleccione una subcarpeta",
+                                                clearable=False,
+                                            ),
+                                            html.Button(
+                                                "Subir un nivel",
+                                                id="directory-browser-up",
+                                                className="directory-button",
+                                                n_clicks=0,
+                                                disabled=True,
+                                            ),
+                                        ],
+                                        className="input-stack",
                                     ),
                                     html.Div(
                                         [
@@ -225,7 +245,7 @@ def build_layout() -> html.Div:
                             ),
                             html.Label("Archivo en análisis"),
                             html.Div(
-                                "En espera de archivos nuevos.",
+                                "Seleccione una carpeta de datos y espere la llegada de nuevos archivos.",
                                 id="file-info",
                                 className="info",
                             ),
@@ -540,6 +560,10 @@ def build_layout() -> html.Div:
             dcc.Store(id="sensor-config-store"),
             dcc.Store(id="active-file-store"),
             dcc.Store(id="processing-state", data="stopped"),
+            dcc.Store(
+                id="directory-browser-store",
+                data={"path": os.getcwd()},
+            ),
             html.Div(id="error-message", className="error"),
         ],
         className="app-container",

@@ -1,6 +1,8 @@
 """Application factory for the tension monitoring Dash project."""
 from __future__ import annotations
 
+from pathlib import Path
+
 from dash import Dash
 
 from .callbacks import register_callbacks
@@ -10,7 +12,10 @@ from .layout import build_layout
 def create_app() -> Dash:
     """Instantiate and configure the Dash application."""
 
-    app = Dash(__name__)
+    project_root = Path(__file__).resolve().parents[1]
+    assets_path = project_root / "assets"
+
+    app = Dash(__name__, assets_folder=str(assets_path))
     app.title = "Monitor de tensión"
     app.layout = build_layout()
     register_callbacks(app)

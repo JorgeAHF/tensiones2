@@ -89,13 +89,72 @@ def build_layout() -> html.Div:
         [
             html.Div(
                 [
-                    html.H1("Monitor automático de tensión", className="app-title"),
-                    html.P(
-                        "Configure y supervise los parámetros clave de cada tirante en tiempo real.",
-                        className="app-subtitle",
+                    html.Div(
+                        [
+                            html.H1("Monitor automático de tensión", className="app-title"),
+                            html.P(
+                                "Configura y supervisa los parámetros clave de cada tirante en tiempo real.",
+                                className="app-subtitle",
+                            ),
+                            html.Div(
+                                [
+                                    html.Span("Monitoreo continuo", className="hero-chip"),
+                                    html.Span("Alertas configurables", className="hero-chip"),
+                                    html.Span("Analítica visual", className="hero-chip"),
+                                ],
+                                className="hero-chip-group",
+                            ),
+                        ],
+                        className="hero-content",
+                    ),
+                    html.Div(className="hero-visual"),
+                ],
+                className="hero",
+            ),
+            html.Div(
+                [
+                    html.Div(
+                        [
+                            html.Span("Configuración de sensores", className="status-label"),
+                            html.Div(
+                                sensor_status,
+                                id="sensor-config-status",
+                                className="status-value",
+                            ),
+                        ],
+                        className="status-card status-card--primary",
+                    ),
+                    html.Div(
+                        [
+                            html.Span("Archivo en análisis", className="status-label"),
+                            html.Div(
+                                "Seleccione una carpeta de datos y espere la llegada de nuevos archivos.",
+                                id="file-info",
+                                className="status-value",
+                            ),
+                        ],
+                        className="status-card",
+                    ),
+                    html.Div(
+                        [
+                            html.Span("Estado del procesamiento", className="status-label"),
+                            html.Div(
+                                "Lectura detenida. Presione Iniciar para comenzar.",
+                                id="processing-status",
+                                className="status-value",
+                            ),
+                            html.Progress(
+                                id="processing-progress",
+                                max="100",
+                                value="0",
+                                className="processing-progress status-progress",
+                                title="Sin actividad registrada",
+                            ),
+                        ],
+                        className="status-card status-card--progress",
                     ),
                 ],
-                className="header",
+                className="overview-grid",
             ),
             html.Div(
                 [
@@ -286,12 +345,11 @@ def build_layout() -> html.Div:
                                     }
                                 ],
                             ),
-                            html.Div(sensor_status, id="sensor-config-status", className="info"),
                         ],
                         className="panel",
                     ),
                 ],
-                className="layout",
+                className="layout panel-layout",
             ),
             html.Div(
                 [
@@ -316,11 +374,9 @@ def build_layout() -> html.Div:
                                 ],
                                 className="panel-heading",
                             ),
-                            html.Label("Archivo en análisis"),
-                            html.Div(
-                                "Seleccione una carpeta de datos y espere la llegada de nuevos archivos.",
-                                id="file-info",
-                                className="info",
+                            html.P(
+                                "Controla el procesamiento y gestiona los tirantes disponibles.",
+                                className="panel-intro",
                             ),
                             html.Div(
                                 [
@@ -345,24 +401,6 @@ def build_layout() -> html.Div:
                                 ],
                                 className="panel-actions",
                             ),
-                            html.Div(
-                                [
-                                    html.Div(
-                                        "Lectura detenida. Presione Iniciar para comenzar.",
-                                        id="processing-status",
-                                        className="info",
-                                    ),
-                                    html.Progress(
-                                        id="processing-progress",
-                                        max="100",
-                                        value="0",
-                                        className="processing-progress",
-                                        title="Sin actividad registrada",
-                                    ),
-                                ],
-                                className="processing-status-container",
-                            ),
-                            html.Br(),
                             html.Label("Tirante"),
                             dcc.Dropdown(
                                 id="sensor-dropdown",
@@ -387,7 +425,7 @@ def build_layout() -> html.Div:
                         className="panel",
                     ),
                 ],
-                className="layout",
+                className="layout layout--single",
             ),
             html.Div(
                 [
@@ -583,7 +621,7 @@ def build_layout() -> html.Div:
                         className="panel",
                     ),
                 ],
-                className="layout",
+                className="layout layout--stacked",
             ),
             html.Hr(className="divider"),
             html.Div(
@@ -608,7 +646,12 @@ def build_layout() -> html.Div:
                     html.Div(
                         [
                             html.H3("Acelerograma completo", className="graph-title"),
-                            dcc.Graph(id="accelerogram-full", config={"displaylogo": False}),
+                            dcc.Loading(
+                                dcc.Graph(id="accelerogram-full", config={"displaylogo": False}),
+                                type="circle",
+                                color="#0ea5e9",
+                                className="graph-loading",
+                            ),
                         ],
                         className="graph-card",
                         id="accelerogram-full-card",
@@ -616,7 +659,12 @@ def build_layout() -> html.Div:
                     html.Div(
                         [
                             html.H3("Segmento seleccionado", className="graph-title"),
-                            dcc.Graph(id="accelerogram-segment", config={"displaylogo": False}),
+                            dcc.Loading(
+                                dcc.Graph(id="accelerogram-segment", config={"displaylogo": False}),
+                                type="circle",
+                                color="#0ea5e9",
+                                className="graph-loading",
+                            ),
                         ],
                         className="graph-card",
                         id="accelerogram-segment-card",
@@ -629,7 +677,12 @@ def build_layout() -> html.Div:
                     html.Div(
                         [
                             html.H3("Espectro de potencia", className="graph-title"),
-                            dcc.Graph(id="psd-graph", config={"displaylogo": False}),
+                            dcc.Loading(
+                                dcc.Graph(id="psd-graph", config={"displaylogo": False}),
+                                type="circle",
+                                color="#0ea5e9",
+                                className="graph-loading",
+                            ),
                         ],
                         className="graph-card",
                         id="psd-graph-card",
@@ -637,7 +690,12 @@ def build_layout() -> html.Div:
                     html.Div(
                         [
                             html.H3("Espectrograma (STFT)", className="graph-title"),
-                            dcc.Graph(id="stft-graph", config={"displaylogo": False}),
+                            dcc.Loading(
+                                dcc.Graph(id="stft-graph", config={"displaylogo": False}),
+                                type="circle",
+                                color="#0ea5e9",
+                                className="graph-loading",
+                            ),
                         ],
                         className="graph-card",
                         id="stft-graph-card",
@@ -646,6 +704,17 @@ def build_layout() -> html.Div:
                 className="graph-row",
             ),
             html.H2("Resultados", className="section-title results-title"),
+            html.Div(
+                [
+                    html.H3("Tensión por tirante", className="graph-title"),
+                    dcc.Graph(
+                        id="results-history-graph",
+                        config={"displaylogo": False},
+                        className="results-history-figure",
+                    ),
+                ],
+                className="graph-card results-history-card",
+            ),
             DataTable(
                 id="results-table",
                 columns=[],
@@ -681,11 +750,12 @@ def build_layout() -> html.Div:
             dcc.Store(id="processing-state", data="stopped"),
             dcc.Store(id="processing-metadata-store"),
             dcc.Store(id="processed-history-store", data=[]),
+            dcc.Store(id="results-history-store", data=[]),
             dcc.Store(
                 id="directory-browser-store",
                 data={"path": os.getcwd()},
             ),
             html.Div(id="error-message", className="error"),
         ],
-        className="app-container",
+        className="app-shell app-container",
     )

@@ -5,6 +5,7 @@ import json
 import os
 import shutil
 from datetime import datetime
+from io import StringIO
 from typing import Any, Dict, Optional
 
 import pandas as pd
@@ -12,7 +13,12 @@ import plotly.graph_objects as go
 from dash import Dash, Input, Output, State, ctx, html, no_update
 from dash.exceptions import PreventUpdate
 
-from .analysis import analyse_signal, get_directory_files, load_and_prepare_data_from_file
+from .analysis import (
+    analyse_signal,
+    compute_tension,
+    get_directory_files,
+    load_and_prepare_data_from_file,
+)
 from .storage import save_mapping_text, save_sensor_config_store
 
 
@@ -180,7 +186,6 @@ def register_callbacks(app: Dash) -> None:
     @app.callback(
         Output("directory-input", "value"),
         Output("directory-browser-dropdown", "options"),
-        Output("directory-browser-dropdown", "value"),
         Output("directory-browser-breadcrumb", "children"),
         Output("directory-browser-up", "disabled"),
         Output("error-message", "children", allow_duplicate=True),
@@ -194,18 +199,18 @@ def register_callbacks(app: Dash) -> None:
 
         if not path:
             breadcrumb = _breadcrumb_label(path)
-            return "", [], None, breadcrumb, True, ""
+            return "", [], breadcrumb, True, ""
 
         try:
             options = _list_subdirectories(path)
         except ValueError as exc:
-            return "", [], None, _breadcrumb_label(""), True, f"Error al explorar la carpeta: {exc}"
+            return "", [], _breadcrumb_label(""), True, f"Error al explorar la carpeta: {exc}"
 
         breadcrumb = _breadcrumb_label(path)
         parent = os.path.abspath(os.path.join(path, os.pardir))
         disable_up = parent == path
 
-        return path, options, None, breadcrumb, disable_up, ""
+        return path, options, breadcrumb, disable_up, ""
 
     @app.callback(
         Output("sensor-config-table", "data"),
@@ -488,10 +493,21 @@ def register_callbacks(app: Dash) -> None:
         Output("file-info", "children", allow_duplicate=True),
         Output("error-message", "children", allow_duplicate=True),
         Output("processed-history-store", "data", allow_duplicate=True),
+        Output("results-history-store", "data", allow_duplicate=True),
         Input("active-file-store", "data"),
         State("map-textarea", "value"),
         State("sensor-config-store", "data"),
         State("processed-history-store", "data"),
+        State("results-history-store", "data"),
+        State("fs-input", "value"),
+        State("pct-range", "value"),
+        State("nperseg-input", "value"),
+        State("noverlap-input", "value"),
+        State("sigma-input", "value"),
+        State("threshold-input", "value"),
+        State("min-distance-input", "value"),
+        State("harmonics-input", "value"),
+        State("tol-input", "value"),
         prevent_initial_call=True,
     )
     def load_file(
@@ -499,6 +515,16 @@ def register_callbacks(app: Dash) -> None:
         mapping_text: Optional[str],
         config_data: Optional[Dict[str, Any]],
         history_state,
+        results_history_state,
+        fs_value,
+        pct_range_values,
+        nperseg_value,
+        noverlap_value,
+        sigma_value,
+        threshold_value,
+        min_distance_value,
+        harmonics_value,
+        tol_value,
     ):
         if isinstance(path_info, str):
             path = path_info
@@ -518,17 +544,18 @@ def register_callbacks(app: Dash) -> None:
                 "En espera de completar la configuración de los tirantes.",
                 "Complete la configuración de los tirantes antes de continuar.",
                 no_update,
+                no_update,
             )
 
         try:
             sensor_map: Dict[str, str] = json.loads(mapping_text or "{}")
         except json.JSONDecodeError as exc:
-            return None, [], None, "", f"Error en mapeo JSON: {exc}", no_update
+            return None, [], None, "", f"Error en mapeo JSON: {exc}", no_update, no_update
 
         try:
             df = load_and_prepare_data_from_file(path, sensor_map)
         except Exception as exc:  # pylint: disable=broad-except
-            return None, [], None, "", f"Error al leer archivo: {exc}", no_update
+            return None, [], None, "", f"Error al leer archivo: {exc}", no_update, no_update
 
         by_sensor: Dict[str, Dict[str, Any]] = config_data.get("by_sensor", {})
         sensors = [col for col in df.columns if col in by_sensor]
@@ -540,6 +567,7 @@ def register_callbacks(app: Dash) -> None:
                 "",
                 "El archivo no contiene tirantes configurados.",
                 no_update,
+                no_update,
             )
         timestamp = datetime.now()
         timestamp_display = timestamp.strftime("%Y-%m-%d %H:%M:%S")
@@ -547,6 +575,49 @@ def register_callbacks(app: Dash) -> None:
         store_data = {"df": df.to_json(orient="split")}
         sensor_options = [{"label": col, "value": col} for col in sensors]
         sensor_value = sensors[0]
+
+        results_history: list[dict[str, Any]] = []
+        if isinstance(results_history_state, list):
+            results_history = [
+                entry for entry in results_history_state if isinstance(entry, dict)
+            ]
+
+        tension_entry: dict[str, Any] = {
+            "file": os.path.basename(path),
+            "processed_at": timestamp.isoformat(),
+            "processed_at_display": timestamp_display,
+            "tensions": {},
+        }
+
+        for sensor_name in sensors:
+            sensor_params = by_sensor.get(sensor_name) or {}
+            f0_value = sensor_params.get("f0")
+            ke_value = sensor_params.get("ke")
+            use_hint = bool(f0_value and f0_value > 0)
+            try:
+                _, _, _, _, sensor_results, _ = analyse_signal(
+                    df=df,
+                    sensor=sensor_name,
+                    fs=fs_value,
+                    pct_range=pct_range_values,
+                    nperseg=nperseg_value,
+                    noverlap=noverlap_value,
+                    smooth_sigma=sigma_value,
+                    threshold=threshold_value,
+                    min_distance_hz=min_distance_value,
+                    n_harmonics=harmonics_value,
+                    use_hint=use_hint,
+                    f0_hint=f0_value,
+                    tol_hz=tol_value,
+                    length_m=None,
+                    linear_density=None,
+                    ke_ton_s=ke_value,
+                )
+                tension_value = sensor_results.tension
+            except Exception:  # pylint: disable=broad-except
+                tension_value = None
+
+            tension_entry["tensions"][sensor_name] = tension_value
 
         processed_dir = os.path.join(os.path.dirname(path), "procesados")
         os.makedirs(processed_dir, exist_ok=True)
@@ -556,12 +627,14 @@ def register_callbacks(app: Dash) -> None:
             timestamp_suffix = datetime.now().strftime("%Y%m%d_%H%M%S")
             destination = os.path.join(processed_dir, f"{base}_{timestamp_suffix}{ext}")
 
+        final_file_name = os.path.basename(path)
         try:
             shutil.move(path, destination)
         except Exception as exc:  # pylint: disable=broad-except
             info = f"Archivo: {os.path.basename(path)}. Total de muestras: {len(df)}. No se pudo mover el archivo: {exc}"
             status_note = f"Procesado con alertas · {timestamp_display}"
         else:
+            final_file_name = os.path.basename(destination)
             info = (
                 f"Archivo: {os.path.basename(path)}. Total de muestras: {len(df)}. "
                 f"Movido a 'procesados/{os.path.basename(destination)}'."
@@ -573,7 +646,7 @@ def register_callbacks(app: Dash) -> None:
             history_list = [entry for entry in history_state if isinstance(entry, dict)]
 
         history_entry = {
-            "name": os.path.basename(path),
+            "name": final_file_name,
             "processed_at": timestamp.isoformat(),
             "processed_at_display": timestamp_display,
             "note": info,
@@ -582,7 +655,22 @@ def register_callbacks(app: Dash) -> None:
         history_list.insert(0, history_entry)
         history_list = history_list[:10]
 
-        return store_data, sensor_options, sensor_value, info, "", history_list
+        tension_entry["file"] = final_file_name
+        if any(
+            value is not None for value in tension_entry["tensions"].values()
+        ):
+            results_history.insert(0, tension_entry)
+            results_history = results_history[:50]
+
+        return (
+            store_data,
+            sensor_options,
+            sensor_value,
+            info,
+            "",
+            history_list,
+            results_history,
+        )
 
     @app.callback(
         Output("accelerogram-full", "figure"),
@@ -669,10 +757,16 @@ def register_callbacks(app: Dash) -> None:
                 "No se encontraron parámetros configurados para el tirante seleccionado.",
             )
 
-        df = pd.read_json(store_data["df"], orient="split")
+        df = pd.read_json(StringIO(store_data["df"]), orient="split")
         f0_hint = sensor_params.get("f0")
         ke_value = sensor_params.get("ke")
         use_hint = f0_hint is not None and f0_hint > 0
+        tension_from_hint = None
+        if use_hint:
+            tension_from_hint = compute_tension(
+                float(f0_hint),
+                ke_ton_s=float(ke_value) if ke_value is not None else None,
+            )
 
         try:
             (
@@ -738,6 +832,9 @@ def register_callbacks(app: Dash) -> None:
             f"Tensión estimada [{tension_units}]": (
                 f"{results.tension:.2f}" if results.tension is not None else "—"
             ),
+            f"Tensión (f₀ tirante) [{tension_units}]": (
+                f"{tension_from_hint:.2f}" if tension_from_hint is not None else "—"
+            ),
         }
 
         columns = [{"name": name, "id": name} for name in table_data.keys()]
@@ -758,6 +855,97 @@ def register_callbacks(app: Dash) -> None:
             "",
         )
 
+    @app.callback(
+        Output("results-history-graph", "figure"),
+        Input("results-history-store", "data"),
+    )
+    def update_results_history_graph(history_data):
+        fig = go.Figure()
+
+        if not history_data or not isinstance(history_data, list):
+            fig.update_layout(
+                template="plotly_white",
+                margin={"l": 40, "r": 20, "t": 50, "b": 60},
+                xaxis_title="Archivo procesado",
+                yaxis_title="Tensión [Ton]",
+                legend_title_text="Tirante",
+            )
+            fig.add_annotation(
+                text="Aún no hay tensiones registradas.",
+                xref="paper",
+                yref="paper",
+                x=0.5,
+                y=0.5,
+                showarrow=False,
+                font={"size": 14, "color": "#475569"},
+            )
+            return fig
+
+        entries = [
+            entry
+            for entry in history_data
+            if isinstance(entry, dict) and isinstance(entry.get("tensions"), dict)
+        ]
+        if not entries:
+            return update_results_history_graph(None)
+
+        timeline = list(reversed(entries))
+        x_labels = [
+            entry.get("processed_at_display")
+            or entry.get("file")
+            or f"Archivo {idx + 1}"
+            for idx, entry in enumerate(timeline)
+        ]
+
+        sensor_names = sorted(
+            {
+                sensor
+                for entry in timeline
+                for sensor in (entry.get("tensions") or {}).keys()
+            }
+        )
+
+        for sensor_name in sensor_names:
+            y_values = []
+            for entry in timeline:
+                tensions = entry.get("tensions") or {}
+                tension_value = tensions.get(sensor_name)
+                y_values.append(tension_value)
+
+            if all(value is None for value in y_values):
+                continue
+
+            fig.add_trace(
+                go.Scatter(
+                    x=x_labels,
+                    y=y_values,
+                    mode="lines+markers",
+                    name=sensor_name,
+                    connectgaps=True,
+                )
+            )
+
+        fig.update_layout(
+            template="plotly_white",
+            margin={"l": 40, "r": 20, "t": 50, "b": 60},
+            xaxis_title="Archivo procesado",
+            yaxis_title="Tensión [Ton]",
+            legend_title_text="Tirante",
+        )
+        fig.update_xaxes(type="category")
+
+        if not fig.data:
+            fig.add_annotation(
+                text="Los archivos procesados no contienen tensiones válidas.",
+                xref="paper",
+                yref="paper",
+                x=0.5,
+                y=0.5,
+                showarrow=False,
+                font={"size": 14, "color": "#475569"},
+            )
+
+        return fig
     @app.callback(
         Output("sensor-dropdown", "disabled"),
         Input("data-store", "data"),

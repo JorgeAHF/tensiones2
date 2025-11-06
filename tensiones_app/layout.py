@@ -1,16 +1,89 @@
 """Dash layout factory."""
 from __future__ import annotations
 
+import json
 import os
+from typing import Any, Dict
 
 from dash import dcc, html
 from dash.dash_table import DataTable
 
-from .storage import load_last_mapping_text
+from .callbacks import DEFAULT_SENSOR_STATUS, build_sensor_config_payload
+from .storage import (
+    load_last_mapping_text,
+    load_sensor_config_store,
+    save_sensor_config_store,
+)
 
 
 def build_layout() -> html.Div:
     """Return the root layout for the application."""
+
+    mapping_text = load_last_mapping_text()
+    try:
+        mapping_definition = json.loads(mapping_text)
+    except json.JSONDecodeError:
+        mapping_definition = {}
+    if not isinstance(mapping_definition, dict):
+        mapping_definition = {}
+
+    stored_config = load_sensor_config_store()
+    stored_rows: list[dict[str, Any]] = []
+    if isinstance(stored_config, dict):
+        rows = stored_config.get("rows")
+        if isinstance(rows, list):
+            for row in rows:
+                if isinstance(row, dict) and isinstance(row.get("column"), str):
+                    stored_rows.append(row)
+
+    stored_by_column: Dict[str, dict[str, Any]] = {
+        row["column"]: row for row in stored_rows if isinstance(row.get("column"), str)
+    }
+
+    def _default_row(column: str, alias: Any) -> dict[str, Any]:
+        tirante = column
+        f0_value = None
+        ke_value = None
+        if isinstance(alias, dict):
+            tirante = alias.get("tirante") or tirante
+            f0_value = alias.get("f0")
+            ke_value = alias.get("ke")
+        elif isinstance(alias, str):
+            tirante = alias or tirante
+        return {
+            "column": column,
+            "tirante": tirante,
+            "f0": f0_value,
+            "ke": ke_value,
+        }
+
+    initial_rows: list[dict[str, Any]] = []
+    for column, alias in mapping_definition.items():
+        if not isinstance(column, str):
+            continue
+        base_row = _default_row(column, alias)
+        saved_row = stored_by_column.get(column)
+        if saved_row:
+            raw_tirante = saved_row.get("tirante") or base_row["tirante"] or column
+            tirante_value = raw_tirante.strip() if isinstance(raw_tirante, str) else str(raw_tirante)
+            row = {
+                "column": column,
+                "tirante": tirante_value,
+                "f0": saved_row.get("f0") if saved_row.get("f0") not in ("", None) else base_row["f0"],
+                "ke": saved_row.get("ke") if saved_row.get("ke") not in ("", None) else base_row["ke"],
+            }
+        else:
+            row = base_row
+        initial_rows.append(row)
+
+    if initial_rows:
+        sensor_store_data, sensor_status = build_sensor_config_payload(initial_rows)
+        save_sensor_config_store(sensor_store_data)
+    else:
+        sensor_store_data = None
+        sensor_status = DEFAULT_SENSOR_STATUS
+        if stored_config is not None:
+            save_sensor_config_store(None)
 
     return html.Div(
         [
@@ -191,7 +264,7 @@ def build_layout() -> html.Div:
                                         "editable": True,
                                     },
                                 ],
-                                data=[],
+                                data=initial_rows,
                                 editable=True,
                                 style_header={
                                     "backgroundColor": "#eef2ff",
@@ -213,7 +286,7 @@ def build_layout() -> html.Div:
                                     }
                                 ],
                             ),
-                            html.Div(id="sensor-config-status", className="info"),
+                            html.Div(sensor_status, id="sensor-config-status", className="info"),
                         ],
                         className="panel",
                     ),
@@ -557,7 +630,7 @@ def build_layout() -> html.Div:
             ),
             dcc.Store(id="data-store"),
             dcc.Store(id="files-store"),
-            dcc.Store(id="sensor-config-store"),
+            dcc.Store(id="sensor-config-store", data=sensor_store_data),
             dcc.Store(id="active-file-store"),
             dcc.Store(id="processing-state", data="stopped"),
             dcc.Store(

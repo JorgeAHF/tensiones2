@@ -13,10 +13,68 @@ from dash import Dash, Input, Output, State, ctx, no_update
 from dash.exceptions import PreventUpdate
 
 from .analysis import analyse_signal, get_directory_files, load_and_prepare_data_from_file
-from .storage import save_mapping_text
+from .storage import save_mapping_text, save_sensor_config_store
 
 
 EMPTY_FIGURE = go.Figure()
+DEFAULT_SENSOR_STATUS = "Configure los sensores para habilitar la lectura de datos."
+
+
+def build_sensor_config_payload(
+    rows: list[dict[str, Any]]
+) -> tuple[dict[str, Any], str]:
+    """Validate and summarise the sensor configuration rows."""
+
+    complete = True
+    issues: list[str] = []
+    by_sensor: Dict[str, Dict[str, Optional[float]]] = {}
+    seen: set[str] = set()
+
+    def _to_float(value: Any) -> Optional[float]:
+        if value in (None, ""):
+            return None
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
+    for idx, row in enumerate(rows, start=1):
+        column = row.get("column")
+        tirante = (row.get("tirante") or "").strip()
+        f0 = _to_float(row.get("f0"))
+        ke_value = _to_float(row.get("ke"))
+
+        if not tirante:
+            complete = False
+            issues.append(f"Fila {idx}: faltó definir el nombre del tirante.")
+        elif tirante in seen:
+            complete = False
+            issues.append(f"Fila {idx}: el tirante '{tirante}' está duplicado.")
+        else:
+            seen.add(tirante)
+
+        if f0 is None or f0 <= 0:
+            complete = False
+        if ke_value is None or ke_value <= 0:
+            complete = False
+
+        if tirante:
+            by_sensor[tirante] = {
+                "column": column,
+                "f0": f0,
+                "ke": ke_value,
+            }
+
+    status = (
+        "Parámetros completos. Los archivos nuevos se analizarán automáticamente."
+        if complete
+        else "Complete la frecuencia fundamental y el valor de Ke para cada tirante."
+    )
+    if issues:
+        status = " | ".join([status] + issues)
+
+    store_payload = {"rows": rows, "complete": complete, "by_sensor": by_sensor}
+    return store_payload, status
 
 
 def register_callbacks(app: Dash) -> None:
@@ -196,58 +254,11 @@ def register_callbacks(app: Dash) -> None:
     )
     def sync_sensor_config(rows: Optional[list[dict[str, Any]]]):
         if not rows:
-            return None, "Configure los sensores para habilitar la lectura de datos."
+            save_sensor_config_store(None)
+            return None, DEFAULT_SENSOR_STATUS
 
-        complete = True
-        issues: list[str] = []
-        by_sensor: Dict[str, Dict[str, Optional[float]]] = {}
-        seen: set[str] = set()
-
-        for idx, row in enumerate(rows, start=1):
-            column = row.get("column")
-            tirante = (row.get("tirante") or "").strip()
-
-            def _to_float(value: Any) -> Optional[float]:
-                if value in (None, ""):
-                    return None
-                try:
-                    return float(value)
-                except (TypeError, ValueError):
-                    return None
-
-            f0 = _to_float(row.get("f0"))
-            ke_value = _to_float(row.get("ke"))
-
-            if not tirante:
-                complete = False
-                issues.append(f"Fila {idx}: faltó definir el nombre del tirante.")
-            elif tirante in seen:
-                complete = False
-                issues.append(f"Fila {idx}: el tirante '{tirante}' está duplicado.")
-            else:
-                seen.add(tirante)
-
-            if f0 is None or f0 <= 0:
-                complete = False
-            if ke_value is None or ke_value <= 0:
-                complete = False
-
-            if tirante:
-                by_sensor[tirante] = {
-                    "column": column,
-                    "f0": f0,
-                    "ke": ke_value,
-                }
-
-        status = (
-            "Parámetros completos. Los archivos nuevos se analizarán automáticamente."
-            if complete
-            else "Complete la frecuencia fundamental y el valor de Ke para cada tirante."
-        )
-        if issues:
-            status = " | ".join([status] + issues)
-
-        store_payload = {"rows": rows, "complete": complete, "by_sensor": by_sensor}
+        store_payload, status = build_sensor_config_payload(rows)
+        save_sensor_config_store(store_payload)
         return store_payload, status
 
     @app.callback(

@@ -28,41 +28,115 @@ def register_callbacks(app: Dash) -> None:
             return 30000
         return int(seconds * 1000)
 
-    @app.callback(
-        Output("directory-input", "value"),
-        Output("error-message", "children", allow_duplicate=True),
-        Input("select-directory-button", "n_clicks"),
-        State("directory-input", "value"),
-        prevent_initial_call=True,
-    )
-    def select_directory(n_clicks: Optional[int], current_value: Optional[str]):
-        if not n_clicks:
-            raise PreventUpdate
+    def _normalize_directory(path: str) -> str:
+        """Return a validated absolute directory path."""
 
-        selected_dir: Optional[str] = None
-        root = None
+        if not path:
+            raise ValueError("ruta vacía.")
+
+        expanded = os.path.abspath(os.path.expanduser(path))
+
+        if not os.path.exists(expanded):
+            raise ValueError("la carpeta no existe.")
+        if not os.path.isdir(expanded):
+            raise ValueError("la ruta no es una carpeta.")
+        if not os.access(expanded, os.R_OK):
+            raise ValueError("no hay permisos de lectura.")
+
+        return expanded
+
+    def _list_subdirectories(path: str) -> list[dict[str, str]]:
+        """Return dropdown options for the subdirectories of ``path``."""
 
         try:
-            import tkinter as tk
-            from tkinter import filedialog
+            entries = [
+                (entry.name, entry.path)
+                for entry in os.scandir(path)
+                if entry.is_dir()
+            ]
+        except OSError as exc:
+            raise ValueError(str(exc)) from exc
 
-            root = tk.Tk()
-            root.withdraw()
-            root.attributes("-topmost", True)
-            initial_dir = current_value if current_value else os.getcwd()
-            selected_dir = filedialog.askdirectory(initialdir=initial_dir)
-        except Exception as exc:  # pylint: disable=broad-except
-            if root is not None:
-                root.destroy()
-            return current_value, f"No se pudo abrir el selector de directorio: {exc}"
-        finally:
-            if root is not None:
-                root.destroy()
+        entries.sort(key=lambda item: item[0].lower())
+        return [{"label": name, "value": full_path} for name, full_path in entries]
 
-        if not selected_dir:
+    def _breadcrumb_label(path: str) -> str:
+        if not path:
+            return "Ninguna carpeta seleccionada."
+        return f"Carpeta actual: {path}"
+
+    @app.callback(
+        Output("directory-browser-store", "data"),
+        Output("error-message", "children", allow_duplicate=True),
+        Input("directory-input", "value"),
+        Input("directory-browser-dropdown", "value"),
+        Input("directory-browser-up", "n_clicks"),
+        State("directory-browser-store", "data"),
+        prevent_initial_call=True,
+    )
+    def update_directory_browser(
+        manual_path: Optional[str],
+        selected_subdir: Optional[str],
+        up_clicks: Optional[int],
+        store_data: Optional[Dict[str, Any]],
+    ):
+        triggered = ctx.triggered_id
+        store_data = store_data or {}
+        current_path = store_data.get("path") or ""
+
+        if triggered == "directory-browser-up":
+            if not current_path:
+                raise PreventUpdate
+            parent = os.path.abspath(os.path.join(current_path, os.pardir))
+            if parent == current_path:
+                raise PreventUpdate
+            target = parent
+        elif triggered == "directory-browser-dropdown":
+            if not selected_subdir:
+                raise PreventUpdate
+            target = selected_subdir
+        elif triggered == "directory-input":
+            if manual_path is None or manual_path == current_path:
+                raise PreventUpdate
+            target = manual_path
+        else:
             raise PreventUpdate
 
-        return selected_dir, ""
+        try:
+            normalized = _normalize_directory(target)
+        except ValueError as exc:
+            return store_data, f"No se puede acceder a '{target}': {exc}"
+
+        return {"path": normalized}, ""
+
+    @app.callback(
+        Output("directory-input", "value"),
+        Output("directory-browser-dropdown", "options"),
+        Output("directory-browser-dropdown", "value"),
+        Output("directory-browser-breadcrumb", "children"),
+        Output("directory-browser-up", "disabled"),
+        Output("error-message", "children", allow_duplicate=True),
+        Input("directory-browser-store", "data"),
+    )
+    def sync_directory_browser(store_data: Optional[Dict[str, Any]]):
+        path = ""
+        if isinstance(store_data, dict):
+            path = store_data.get("path") or ""
+
+        if not path:
+            breadcrumb = _breadcrumb_label(path)
+            return "", [], None, breadcrumb, True, ""
+
+        try:
+            options = _list_subdirectories(path)
+        except ValueError as exc:
+            return "", [], None, _breadcrumb_label(""), True, f"Error al explorar la carpeta: {exc}"
+
+        breadcrumb = _breadcrumb_label(path)
+        parent = os.path.abspath(os.path.join(path, os.pardir))
+        disable_up = parent == path
+
+        return path, options, None, breadcrumb, disable_up, ""
 
     @app.callback(
         Output("sensor-config-table", "data"),
@@ -256,7 +330,7 @@ def register_callbacks(app: Dash) -> None:
 
         if trigger == "start-processing":
             if not directory:
-                message = "Seleccione un directorio antes de iniciar."
+                message = "Seleccione una carpeta válida en el explorador antes de iniciar."
                 return (
                     current_state,
                     True,
@@ -303,7 +377,7 @@ def register_callbacks(app: Dash) -> None:
                 "Lectura detenida. Presione Iniciar para comenzar.",
                 None,
                 None,
-                "Lectura detenida.",
+                "Lectura detenida. Seleccione una carpeta cuando desee reanudar.",
             )
 
         raise PreventUpdate

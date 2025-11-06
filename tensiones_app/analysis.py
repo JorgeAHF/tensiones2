@@ -1,10 +1,11 @@
-"""Analytical utilities for the tension monitoring Dash app."""
+"""Signal analysis utilities for the tension monitoring dashboard."""
+
 from __future__ import annotations
 
 import io
 import os
 from dataclasses import dataclass
-from typing import Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
@@ -26,7 +27,7 @@ class AnalysisResults:
     tension: Optional[float]
 
 
-def load_and_prepare_data_from_file(path: str, sensor_map: Dict[str, str]) -> pd.DataFrame:
+def load_and_prepare_data_from_file(path: str, sensor_map: Dict[str, Any]) -> pd.DataFrame:
     """Load CSV data that contains a ``DATA_START`` marker and prepare it for analysis."""
 
     with open(path, "r", encoding="utf-8") as file_handle:
@@ -46,7 +47,17 @@ def load_and_prepare_data_from_file(path: str, sensor_map: Dict[str, str]) -> pd
     df = pd.read_csv(io.StringIO("\n".join(data_lines)), names=headers)
 
     if sensor_map:
-        df.rename(columns=sensor_map, inplace=True)
+        rename_map: Dict[str, str] = {}
+        for original, alias in sensor_map.items():
+            if isinstance(alias, dict):
+                tirante_name = alias.get("tirante")
+                if tirante_name:
+                    rename_map[original] = tirante_name
+            elif isinstance(alias, str) and alias:
+                rename_map[original] = alias
+
+        if rename_map:
+            df.rename(columns=rename_map, inplace=True)
 
     df = df.dropna()
     for column in df.columns[1:]:

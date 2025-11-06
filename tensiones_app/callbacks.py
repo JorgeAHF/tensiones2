@@ -477,7 +477,7 @@ def register_callbacks(app: Dash) -> None:
         Input("harmonics-input", "value"),
         Input("tol-input", "value"),
         Input("sensor-config-store", "data"),
-        prevent_initial_call="initial_duplicate",
+        prevent_initial_call=True,
     )
     def update_analysis(
         store_data: Optional[Dict[str, Any]],

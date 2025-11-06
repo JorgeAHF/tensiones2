@@ -117,7 +117,6 @@ def register_callbacks(app: Dash) -> None:
         Output("directory-browser-up", "disabled"),
         Output("error-message", "children", allow_duplicate=True),
         Input("directory-browser-store", "data"),
-        prevent_initial_call="initial_duplicate",
     )
     def sync_directory_browser(store_data: Optional[Dict[str, Any]]):
         path = ""

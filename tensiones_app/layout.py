@@ -588,12 +588,30 @@ def build_layout() -> html.Div:
             html.Hr(className="divider"),
             html.Div(
                 [
+                    html.Label("Mostrar gráficas"),
+                    dcc.Checklist(
+                        id="graphs-toggle",
+                        options=[
+                            {"label": "Acelerograma completo", "value": "full"},
+                            {"label": "Segmento seleccionado", "value": "segment"},
+                            {"label": "Espectro de potencia", "value": "psd"},
+                            {"label": "Espectrograma (STFT)", "value": "stft"},
+                        ],
+                        value=["full", "segment", "psd", "stft"],
+                        labelStyle={"display": "inline-block", "marginRight": "16px"},
+                    ),
+                ],
+                className="graph-controls",
+            ),
+            html.Div(
+                [
                     html.Div(
                         [
                             html.H3("Acelerograma completo", className="graph-title"),
                             dcc.Graph(id="accelerogram-full", config={"displaylogo": False}),
                         ],
                         className="graph-card",
+                        id="accelerogram-full-card",
                     ),
                     html.Div(
                         [
@@ -601,6 +619,7 @@ def build_layout() -> html.Div:
                             dcc.Graph(id="accelerogram-segment", config={"displaylogo": False}),
                         ],
                         className="graph-card",
+                        id="accelerogram-segment-card",
                     ),
                 ],
                 className="graph-row",
@@ -613,6 +632,7 @@ def build_layout() -> html.Div:
                             dcc.Graph(id="psd-graph", config={"displaylogo": False}),
                         ],
                         className="graph-card",
+                        id="psd-graph-card",
                     ),
                     html.Div(
                         [
@@ -620,6 +640,7 @@ def build_layout() -> html.Div:
                             dcc.Graph(id="stft-graph", config={"displaylogo": False}),
                         ],
                         className="graph-card",
+                        id="stft-graph-card",
                     ),
                 ],
                 className="graph-row",

@@ -589,6 +589,10 @@ def register_callbacks(app: Dash) -> None:
         Output("accelerogram-segment", "figure"),
         Output("psd-graph", "figure"),
         Output("stft-graph", "figure"),
+        Output("accelerogram-full-card", "style"),
+        Output("accelerogram-segment-card", "style"),
+        Output("psd-graph-card", "style"),
+        Output("stft-graph-card", "style"),
         Output("results-table", "columns"),
         Output("results-table", "data"),
         Output("pct-label", "children"),
@@ -605,6 +609,7 @@ def register_callbacks(app: Dash) -> None:
         Input("harmonics-input", "value"),
         Input("tol-input", "value"),
         Input("sensor-config-store", "data"),
+        Input("graphs-toggle", "value"),
         prevent_initial_call=True,
     )
     def update_analysis(
@@ -620,9 +625,32 @@ def register_callbacks(app: Dash) -> None:
         n_harmonics,
         tol_hz,
         sensor_config_data: Optional[Dict[str, Any]],
+        graph_visibility,
     ):
+        default_graphs = {"full", "segment", "psd", "stft"}
+        if graph_visibility is None:
+            selected_graphs = default_graphs
+        else:
+            selected_graphs = set(graph_visibility)
+
+        def _card_style(key: str) -> Optional[Dict[str, str]]:
+            return None if key in selected_graphs else {"display": "none"}
+
         if not store_data or not sensor:
-            return EMPTY_FIGURE, EMPTY_FIGURE, EMPTY_FIGURE, EMPTY_FIGURE, [], [], "", ""
+            return (
+                EMPTY_FIGURE,
+                EMPTY_FIGURE,
+                EMPTY_FIGURE,
+                EMPTY_FIGURE,
+                _card_style("full"),
+                _card_style("segment"),
+                _card_style("psd"),
+                _card_style("stft"),
+                [],
+                [],
+                "",
+                "",
+            )
 
         sensor_params = (sensor_config_data or {}).get("by_sensor", {}).get(sensor)
         if not sensor_params:
@@ -631,6 +659,10 @@ def register_callbacks(app: Dash) -> None:
                 EMPTY_FIGURE,
                 EMPTY_FIGURE,
                 EMPTY_FIGURE,
+                _card_style("full"),
+                _card_style("segment"),
+                _card_style("psd"),
+                _card_style("stft"),
                 [],
                 [],
                 "",
@@ -674,6 +706,10 @@ def register_callbacks(app: Dash) -> None:
                 EMPTY_FIGURE,
                 EMPTY_FIGURE,
                 EMPTY_FIGURE,
+                _card_style("full"),
+                _card_style("segment"),
+                _card_style("psd"),
+                _card_style("stft"),
                 [],
                 [],
                 "",
@@ -712,6 +748,10 @@ def register_callbacks(app: Dash) -> None:
             accel_segment_fig,
             psd_fig,
             stft_fig,
+            _card_style("full"),
+            _card_style("segment"),
+            _card_style("psd"),
+            _card_style("stft"),
             columns,
             data,
             pct_label,

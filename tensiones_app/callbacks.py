@@ -126,21 +126,27 @@ def register_callbacks(app: Dash) -> None:
     @app.callback(
         Output("directory-browser-store", "data"),
         Output("error-message", "children", allow_duplicate=True),
-        Input("directory-input", "value"),
+        Input("directory-input", "n_submit"),
+        Input("directory-input", "n_blur"),
         Input("directory-browser-dropdown", "value"),
         Input("directory-browser-up", "n_clicks"),
+        State("directory-input", "value"),
         State("directory-browser-store", "data"),
         prevent_initial_call=True,
     )
     def update_directory_browser(
-        manual_path: Optional[str],
+        _manual_submit: Optional[int],
+        _manual_blur: Optional[int],
         selected_subdir: Optional[str],
         up_clicks: Optional[int],
+        manual_value: Optional[str],
         store_data: Optional[Dict[str, Any]],
     ):
         triggered = ctx.triggered_id
         store_data = store_data or {}
         current_path = store_data.get("path") or ""
+
+        triggered_prop = ctx.triggered[0]["prop_id"] if ctx.triggered else ""
 
         if triggered == "directory-browser-up":
             if not current_path:
@@ -153,8 +159,12 @@ def register_callbacks(app: Dash) -> None:
             if not selected_subdir:
                 raise PreventUpdate
             target = selected_subdir
-        elif triggered == "directory-input":
-            if manual_path is None or manual_path == current_path:
+        elif triggered == "directory-input" and triggered_prop in {
+            "directory-input.n_submit",
+            "directory-input.n_blur",
+        }:
+            manual_path = (manual_value or "").strip()
+            if not manual_path or manual_path == current_path:
                 raise PreventUpdate
             target = manual_path
         else:
@@ -816,4 +826,4 @@ def register_callbacks(app: Dash) -> None:
         if not title_parts:
             title_parts.append("Sin actividad registrada")
 
-        return value, 100, " · ".join(title_parts)
+        return str(value), "100", " · ".join(title_parts)

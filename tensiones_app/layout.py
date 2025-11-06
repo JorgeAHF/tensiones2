@@ -354,8 +354,8 @@ def build_layout() -> html.Div:
                                     ),
                                     html.Progress(
                                         id="processing-progress",
-                                        max=100,
-                                        value=0,
+                                        max="100",
+                                        value="0",
                                         className="processing-progress",
                                         title="Sin actividad registrada",
                                     ),

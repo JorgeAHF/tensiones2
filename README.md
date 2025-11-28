@@ -35,3 +35,22 @@ timestamp_local,timestamp_utc,stay_id,sensor_id,fs_hz,ax_g,ay_g,az_g,is_valid
 ```
 
 La aplicación toma el canal de aceleración disponible (priorizando `az_g`), filtra filas inválidas y, si defines un mapeo JSON en la barra lateral, renombra cada `sensor_id` al tirante configurado.
+
+### Ejemplo de mapeo para varios sensores
+
+En la barra lateral ingresa un JSON que traduzca el `sensor_id` presente en cada CSV al nombre del tirante que quieres ver en las gráficas y, opcionalmente, la frecuencia fundamental sugerida (`f0`) y el parámetro de rigidez `Ke` para el cálculo de tensión. Un mapeo típico para leer y analizar múltiples archivos de sensores en paralelo sería:
+
+```json
+{
+  "10603": {"tirante": "Tirante A", "f0": 1.05, "ke": 0.82},
+  "20801": {"tirante": "Tirante B", "f0": 0.95, "ke": 0.80},
+  "31277": "Tirante C"
+}
+```
+
+- Cada entrada usa como clave el `sensor_id` que aparece en el CSV (`10603`, `20801`, etc.).
+- `tirante` define el nombre visible en tablas y gráficas; si sólo proporcionas una cadena, se toma directamente como tirante.
+- `f0` (opcional) precarga una frecuencia fundamental sugerida para el refinamiento del análisis.
+- `ke` (opcional) es el coeficiente de rigidez para estimar la tensión en toneladas.
+
+Con este mapeo, al cargar un archivo como `sensor_10603_acceleration_20251114_162708_000-002min.csv` la columna de aceleración se almacenará bajo el nombre `Tirante A`, mientras que otro archivo de `sensor_20801` se etiquetará como `Tirante B`. La aplicación filtrará automáticamente cada archivo por su `sensor_id`, aplicará el alias configurado y usará `f0` y `Ke` para el análisis de tensión de cada tirante.

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import io
 import os
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
@@ -28,42 +27,60 @@ class AnalysisResults:
 
 
 def load_and_prepare_data_from_file(path: str, sensor_map: Dict[str, Any]) -> pd.DataFrame:
-    """Load CSV data that contains a ``DATA_START`` marker and prepare it for analysis."""
+    """Load the new per-sensor CSV format and return a tidy DataFrame.
 
-    with open(path, "r", encoding="utf-8") as file_handle:
-        lines = file_handle.read().splitlines()
+    The expected CSV structure is:
 
-    data_start_index = None
-    for idx, line in enumerate(lines):
-        if "DATA_START" in line:
-            data_start_index = idx + 1
-            break
+    ``timestamp_local,timestamp_utc,stay_id,sensor_id,fs_hz,ax_g,ay_g,az_g,is_valid``
 
-    if data_start_index is None:
-        raise ValueError("No se encontró la etiqueta 'DATA_START' en el archivo.")
+    A single file corresponds to a single sensor. The acceleration component is
+    selected with the following priority: ``az_g`` → ``ay_g`` → ``ax_g``. Only
+    rows marked as valid and with numeric acceleration are kept.
+    """
 
-    headers = lines[data_start_index].strip().split(",")
-    data_lines = lines[data_start_index + 1 :]
-    df = pd.read_csv(io.StringIO("\n".join(data_lines)), names=headers)
+    raw = pd.read_csv(path)
 
+    if raw.empty:
+        raise ValueError("El archivo está vacío.")
+
+    accel_candidates = [col for col in ("az_g", "ay_g", "ax_g") if col in raw.columns]
+    if not accel_candidates:
+        raise ValueError("No se encontraron columnas de aceleración (ax_g/ay_g/az_g).")
+
+    accel_column = next(
+        (col for col in ("az_g", "ay_g", "ax_g") if col in accel_candidates and raw[col].notna().any()),
+        accel_candidates[0],
+    )
+
+    df = raw.copy()
+    if "is_valid" in df.columns:
+        df = df[df["is_valid"].astype(bool)]
+
+    df[accel_column] = pd.to_numeric(df[accel_column], errors="coerce")
+    df = df.dropna(subset=[accel_column])
+
+    if df.empty:
+        raise ValueError("No hay muestras válidas tras filtrar los datos de aceleración.")
+
+    sensor_id_value = str(df.iloc[0].get("sensor_id", "sensor"))
+    sensor_name = sensor_id_value
     if sensor_map:
-        rename_map: Dict[str, str] = {}
-        for original, alias in sensor_map.items():
-            if isinstance(alias, dict):
-                tirante_name = alias.get("tirante")
-                if tirante_name:
-                    rename_map[original] = tirante_name
-            elif isinstance(alias, str) and alias:
-                rename_map[original] = alias
+        alias = sensor_map.get(sensor_id_value)
+        if isinstance(alias, dict):
+            sensor_name = alias.get("tirante") or sensor_name
+        elif isinstance(alias, str) and alias:
+            sensor_name = alias
 
-        if rename_map:
-            df.rename(columns=rename_map, inplace=True)
+    timestamp_column = "timestamp_utc" if "timestamp_utc" in df.columns else None
+    if timestamp_column is None and "timestamp_local" in df.columns:
+        timestamp_column = "timestamp_local"
 
-    df = df.dropna()
-    for column in df.columns[1:]:
-        df[column] = pd.to_numeric(df[column], errors="coerce")
-    df = df.dropna()
-    return df
+    if timestamp_column:
+        result = pd.DataFrame({timestamp_column: df[timestamp_column].values, sensor_name: df[accel_column].values})
+    else:
+        result = pd.DataFrame({sensor_name: df[accel_column].values})
+
+    return result
 
 def compute_psd(
     signal: np.ndarray,

@@ -28,4 +28,10 @@ python app.py
    - Longitud y masa lineal del tirante para estimar la tensión.
 5. La interfaz actualizará automáticamente la lista de archivos. Selecciona el deseado y revisa las gráficas (acelerograma completo, segmento, PSD y STFT) y la tabla de resultados.
 
-Los archivos CSV deben incluir una línea con la etiqueta `DATA_START`, seguida por una fila de encabezados y las muestras. Puedes proporcionar un mapeo JSON en la barra lateral para renombrar columnas de sensores.
+Los archivos CSV ahora se generan por sensor con nombres como `sensor_10603_acceleration_20251114_162708_000-002min.csv` y contienen los encabezados:
+
+```
+timestamp_local,timestamp_utc,stay_id,sensor_id,fs_hz,ax_g,ay_g,az_g,is_valid
+```
+
+La aplicación toma el canal de aceleración disponible (priorizando `az_g`), filtra filas inválidas y, si defines un mapeo JSON en la barra lateral, renombra cada `sensor_id` al tirante configurado.

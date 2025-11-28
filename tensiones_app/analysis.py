@@ -534,15 +534,21 @@ def analyse_signal(
 
 
 def get_directory_files(directory: str) -> List[str]:
-    """Return the list of CSV files in ``directory`` ordered by modification time."""
+    """Return the list of CSV files within ``directory`` and its subfolders."""
 
     if not directory or not os.path.isdir(directory):
         return []
-    files = [
-        os.path.join(directory, fname)
-        for fname in os.listdir(directory)
-        if fname.lower().endswith(".csv")
-    ]
+
+    files: list[str] = []
+
+    for root, dirs, filenames in os.walk(directory):
+        # Skip folders where processed files are stored to avoid reprocessing.
+        dirs[:] = [d for d in dirs if d.lower() != "procesados"]
+
+        for fname in filenames:
+            if fname.lower().endswith(".csv"):
+                files.append(os.path.join(root, fname))
+
     # Process the oldest files first so the historical data is handled before
     # newer captures. Ordering ascending by modification time makes the
     # refresh callback pick the earliest pending file.

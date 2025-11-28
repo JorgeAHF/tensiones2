@@ -479,14 +479,14 @@ def build_layout() -> html.Div:
                                                                 step=256,
                                                                 value=2048,
                                                             ),
-                                                        ],
-                                                        className="control-item",
-                                                    ),
-                                                ],
-                                                className="control-grid",
-                                            ),
-                                        ],
-                                        className="parameter-section",
+                                                    ],
+                                                    className="control-item",
+                                                ),
+                                            ],
+                                            className="control-grid",
+                                        ),
+                                    ],
+                                    className="parameter-section",
                                     ),
                                     html.Div(
                                         [
@@ -494,6 +494,49 @@ def build_layout() -> html.Div:
                                             html.P(
                                                 "Configura los criterios para identificar la frecuencia fundamental y armónicos.",
                                                 className="section-description",
+                                            ),
+                                            html.Div(
+                                                [
+                                                    html.Div(
+                                                        [
+                                                            html.Label("Modo de frecuencia base"),
+                                                            html.P(
+                                                                "El análisis usa la f₀ configurada para el tirante. Activa el modo manual si necesitas probar otra frecuencia mientras retensas.",
+                                                                className="info-note",
+                                                            ),
+                                                            dcc.Checklist(
+                                                                id="manual-mode-toggle",
+                                                                options=[
+                                                                    {
+                                                                        "label": "Ingresar f₀ manual",
+                                                                        "value": "manual",
+                                                                    }
+                                                                ],
+                                                                value=[],
+                                                                className="compact-checklist",
+                                                            ),
+                                                        ],
+                                                        className="control-item",
+                                                    ),
+                                                    html.Div(
+                                                        [
+                                                            html.Label("f₀ manual (Hz)"),
+                                                            dcc.Input(
+                                                                id="manual-frequency-input",
+                                                                type="number",
+                                                                min=0.01,
+                                                                step=0.01,
+                                                                placeholder="Ej: 3.25",
+                                                            ),
+                                                            html.P(
+                                                                "Esta frecuencia guía la búsqueda de armónicos y la estimación de tensión mientras el modo manual está activo.",
+                                                                className="info-note",
+                                                            ),
+                                                        ],
+                                                        className="control-item",
+                                                    ),
+                                                ],
+                                                className="control-grid",
                                             ),
                                             html.Div(
                                                 [

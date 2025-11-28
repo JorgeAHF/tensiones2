@@ -1,7 +1,6 @@
 """Dash layout factory."""
 from __future__ import annotations
 
-import json
 import os
 from typing import Any, Dict
 
@@ -9,81 +8,68 @@ from dash import dcc, html
 from dash.dash_table import DataTable
 
 from .callbacks import DEFAULT_SENSOR_STATUS, build_sensor_config_payload
-from .storage import (
-    load_last_mapping_text,
-    load_sensor_config_store,
-    save_sensor_config_store,
-)
+from .storage import load_sensor_config_store, save_sensor_config_store
+
+
+DEFAULT_SENSOR_IDS = ["3808", "3810", "10589", "10598", "10603", "14030", "14031"]
 
 
 def build_layout() -> html.Div:
     """Return the root layout for the application."""
-
-    mapping_text = load_last_mapping_text()
-    try:
-        mapping_definition = json.loads(mapping_text)
-    except json.JSONDecodeError:
-        mapping_definition = {}
-    if not isinstance(mapping_definition, dict):
-        mapping_definition = {}
 
     stored_config = load_sensor_config_store()
     stored_rows: list[dict[str, Any]] = []
     if isinstance(stored_config, dict):
         rows = stored_config.get("rows")
         if isinstance(rows, list):
-            for row in rows:
-                if isinstance(row, dict) and isinstance(row.get("column"), str):
-                    stored_rows.append(row)
+            stored_rows = [row for row in rows if isinstance(row, dict)]
 
-    stored_by_column: Dict[str, dict[str, Any]] = {
-        row["column"]: row for row in stored_rows if isinstance(row.get("column"), str)
-    }
+    stored_by_sensor: Dict[str, dict[str, Any]] = {}
+    for row in stored_rows:
+        sensor_id = str(row.get("sensor_id") or row.get("column") or "").strip()
+        if sensor_id:
+            stored_by_sensor[sensor_id] = row
 
-    def _default_row(column: str, alias: Any) -> dict[str, Any]:
-        tirante = column
-        f0_value = None
-        ke_value = None
-        if isinstance(alias, dict):
-            tirante = alias.get("tirante") or tirante
-            f0_value = alias.get("f0")
-            ke_value = alias.get("ke")
-        elif isinstance(alias, str):
-            tirante = alias or tirante
+    def _base_row(sensor_id: str) -> dict[str, Any]:
         return {
-            "column": column,
-            "tirante": tirante,
-            "f0": f0_value,
-            "ke": ke_value,
+            "sensor_id": sensor_id,
+            "tirante": f"Tirante {sensor_id}",
+            "f0": None,
+            "ke": None,
+            "active": True,
         }
 
-    initial_rows: list[dict[str, Any]] = []
-    for column, alias in mapping_definition.items():
-        if not isinstance(column, str):
-            continue
-        base_row = _default_row(column, alias)
-        saved_row = stored_by_column.get(column)
-        if saved_row:
-            raw_tirante = saved_row.get("tirante") or base_row["tirante"] or column
-            tirante_value = raw_tirante.strip() if isinstance(raw_tirante, str) else str(raw_tirante)
-            row = {
-                "column": column,
-                "tirante": tirante_value,
-                "f0": saved_row.get("f0") if saved_row.get("f0") not in ("", None) else base_row["f0"],
-                "ke": saved_row.get("ke") if saved_row.get("ke") not in ("", None) else base_row["ke"],
-            }
+    def _merge_row(sensor_id: str) -> dict[str, Any]:
+        base = _base_row(sensor_id)
+        saved = stored_by_sensor.get(sensor_id) or {}
+        tirante_raw = saved.get("tirante") or base["tirante"]
+        tirante_value = tirante_raw.strip() if isinstance(tirante_raw, str) else str(tirante_raw)
+        f0_value = saved.get("f0") if saved.get("f0") not in ("", None) else base["f0"]
+        ke_value = saved.get("ke") if saved.get("ke") not in ("", None) else base["ke"]
+        active_value = saved.get("active")
+        if isinstance(active_value, str):
+            active_value = active_value.lower() == "true"
+        elif active_value is None:
+            active_value = True
         else:
-            row = base_row
-        initial_rows.append(row)
+            active_value = bool(active_value)
+        return {
+            "sensor_id": sensor_id,
+            "tirante": tirante_value,
+            "f0": f0_value,
+            "ke": ke_value,
+            "active": active_value,
+        }
 
-    if initial_rows:
-        sensor_store_data, sensor_status = build_sensor_config_payload(initial_rows)
-        save_sensor_config_store(sensor_store_data)
-    else:
-        sensor_store_data = None
-        sensor_status = DEFAULT_SENSOR_STATUS
-        if stored_config is not None:
-            save_sensor_config_store(None)
+    initial_rows: list[dict[str, Any]] = [_merge_row(sensor_id) for sensor_id in DEFAULT_SENSOR_IDS]
+
+    # Keep any stored sensors that are not in the default list.
+    for sensor_id, row in stored_by_sensor.items():
+        if sensor_id not in DEFAULT_SENSOR_IDS:
+            initial_rows.append(_merge_row(sensor_id))
+
+    sensor_store_data, sensor_status = build_sensor_config_payload(initial_rows)
+    save_sensor_config_store(sensor_store_data)
 
     return html.Div(
         [
@@ -251,7 +237,7 @@ def build_layout() -> html.Div:
                                                 className="section-title",
                                             ),
                                             html.P(
-                                                "Asigne un nombre a cada tirante, indique su frecuencia fundamental propuesta y el valor de Ke (Ton·s).",
+                                                "Activa los sensores disponibles y define el tirante, la frecuencia fundamental f₀ y el valor de Ke (Ton·s).",
                                                 className="section-description",
                                             ),
                                         ],
@@ -260,90 +246,97 @@ def build_layout() -> html.Div:
                                 ],
                                 className="panel-heading",
                             ),
-                            html.Label("Mapeo de sensores (JSON)"),
-                            dcc.Textarea(
-                                id="map-textarea",
-                                value=load_last_mapping_text(),
-                                placeholder='{"canal_raw": {"tirante": "Tirante 1", "f0": 1.2, "ke": 0.45}}',
-                                style={"width": "100%", "height": "140px"},
-                            ),
-                            html.Details(
+                            html.Div(
                                 [
-                                    html.Summary("Ver ejemplo completo de mapeo"),
+                                    html.P(
+                                        "Los siguientes sensores están preconfigurados. Marca cuáles estarán activos y ajusta sus parámetros.",
+                                        className="info",
+                                    ),
                                     html.Div(
-                                        [
-                                            html.P(
-                                                "Puedes copiar y adaptar el siguiente formato para mapear múltiples sensores:",
-                                                className="section-description",
-                                            ),
-                                            html.Pre(
-                                                '{\n    "canal_x": {"tirante": "Tirante Norte", "f0": 1.35, "ke": 0.42},\n    "canal_y": {"tirante": "Tirante Sur", "f0": 1.18, "ke": 0.38},\n    "canal_z": {"tirante": "Tirante Central", "f0": 1.42, "ke": 0.47}\n}',
-                                                className="code-example",
-                                            ),
-                                            html.P(
-                                                "Cada clave representa el nombre de la columna en el archivo CSV y el valor define el tirante asociado junto a sus parámetros iniciales.",
-                                                className="info-note",
-                                            ),
-                                        ],
-                                        className="example-card",
+                                        f"{len(initial_rows)} sensor(es) preconfigurados. Activa solo los necesarios y completa sus parámetros.",
+                                        id="mapping-status",
+                                        className="info info--subtle",
                                     ),
                                 ],
-                                className="example-details",
+                                className="input-stack",
                             ),
-                            html.Button(
-                                "Aplicar mapeo",
-                                id="apply-map-button",
-                                className="directory-button",
-                                n_clicks=0,
-                            ),
-                            html.Div(id="mapping-status", className="info"),
-                            DataTable(
-                                id="sensor-config-table",
-                                columns=[
-                                    {
-                                        "name": "Columna original",
-                                        "id": "column",
-                                        "editable": False,
+                            html.Div(
+                                DataTable(
+                                    id="sensor-config-table",
+                                    columns=[
+                                        {
+                                            "name": "Activo",
+                                            "id": "active",
+                                            "presentation": "dropdown",
+                                            "editable": True,
+                                        },
+                                        {
+                                            "name": "Sensor ID",
+                                            "id": "sensor_id",
+                                            "editable": False,
+                                        },
+                                        {
+                                            "name": "Tirante",
+                                            "id": "tirante",
+                                            "editable": True,
+                                        },
+                                        {
+                                            "name": "f₀ propuesta (Hz)",
+                                            "id": "f0",
+                                            "type": "numeric",
+                                            "editable": True,
+                                        },
+                                        {
+                                            "name": "Ke (Ton·s)",
+                                            "id": "ke",
+                                            "type": "numeric",
+                                            "editable": True,
+                                        },
+                                    ],
+                                    data=initial_rows,
+                                    dropdown={
+                                        "active": {
+                                            "options": [
+                                                {"label": "Sí", "value": True},
+                                                {"label": "No", "value": False},
+                                            ],
+                                            "clearable": False,
+                                        }
                                     },
-                                    {
-                                        "name": "Tirante",
-                                        "id": "tirante",
-                                        "editable": True,
+                                    editable=True,
+                                    row_deletable=False,
+                                    fill_width=True,
+                                    style_table={
+                                        "overflowX": "auto",
+                                        "minWidth": "100%",
                                     },
-                                    {
-                                        "name": "f₀ propuesta (Hz)",
-                                        "id": "f0",
-                                        "type": "numeric",
-                                        "editable": True,
-                                    },
-                                    {
-                                        "name": "Ke (Ton·s)",
-                                        "id": "ke",
-                                        "type": "numeric",
-                                        "editable": True,
-                                    },
-                                ],
-                                data=initial_rows,
-                                editable=True,
-                                style_header={
-                                    "backgroundColor": "#eef2ff",
-                                    "fontWeight": "600",
-                                    "color": "#1e1b4b",
-                                    "border": "0px",
-                                },
-                                style_cell={
-                                    "backgroundColor": "#ffffff",
-                                    "border": "0px",
-                                    "color": "#1f2937",
-                                    "fontFamily": "'Inter', 'Segoe UI', sans-serif",
-                                },
-                                style_data_conditional=[
-                                    {
-                                        "if": {"column_id": "column"},
+                                    style_header={
+                                        "backgroundColor": "#eef2ff",
                                         "fontWeight": "600",
                                         "color": "#1e1b4b",
-                                    }
-                                ],
+                                        "border": "0px",
+                                    },
+                                    style_cell={
+                                        "backgroundColor": "#ffffff",
+                                        "border": "0px",
+                                        "color": "#1f2937",
+                                        "fontFamily": "'Inter', 'Segoe UI', sans-serif",
+                                        "padding": "10px",
+                                    },
+                                    style_cell_conditional=[
+                                        {"if": {"column_id": "active"}, "width": "80px"},
+                                        {"if": {"column_id": "sensor_id"}, "width": "120px"},
+                                        {"if": {"column_id": "tirante"}, "width": "200px"},
+                                    ],
+                                    style_data_conditional=[
+                                        {
+                                            "if": {"column_id": "sensor_id"},
+                                            "fontWeight": "600",
+                                            "color": "#1e1b4b",
+                                        }
+                                    ],
+                                ),
+                                className="table-card",
                             ),
                         ],
                         className="panel",

@@ -1,7 +1,6 @@
 """Dash callbacks for the tension monitoring app."""
 from __future__ import annotations
 
-import json
 import os
 import shutil
 from datetime import datetime
@@ -19,7 +18,7 @@ from .analysis import (
     get_directory_files,
     load_and_prepare_data_from_file,
 )
-from .storage import save_mapping_text, save_sensor_config_store
+from .storage import save_sensor_config_store
 
 
 EMPTY_FIGURE = go.Figure()
@@ -34,7 +33,13 @@ def build_sensor_config_payload(
     complete = True
     issues: list[str] = []
     by_sensor: Dict[str, Dict[str, Optional[float]]] = {}
+    mapping_by_id: Dict[str, Dict[str, Optional[float]]] = {}
     seen: set[str] = set()
+
+    active_rows = [row for row in rows if row.get("active") not in (False, 0, "False", "false")]
+    if not active_rows:
+        complete = False
+        issues.append("Activa al menos un sensor para comenzar a procesar archivos.")
 
     def _to_float(value: Any) -> Optional[float]:
         if value in (None, ""):
@@ -45,10 +50,18 @@ def build_sensor_config_payload(
             return None
 
     for idx, row in enumerate(rows, start=1):
-        column = row.get("column")
+        is_active = row.get("active") not in (False, 0, "False", "false")
+        sensor_id = str(row.get("sensor_id") or row.get("column") or "").strip()
         tirante = (row.get("tirante") or "").strip()
         f0 = _to_float(row.get("f0"))
         ke_value = _to_float(row.get("ke"))
+
+        if not is_active:
+            continue
+
+        if not sensor_id:
+            complete = False
+            issues.append(f"Fila {idx}: faltó el identificador de sensor.")
 
         if not tirante:
             complete = False
@@ -64,9 +77,14 @@ def build_sensor_config_payload(
         if ke_value is None or ke_value <= 0:
             complete = False
 
-        if tirante:
+        if tirante and sensor_id:
             by_sensor[tirante] = {
-                "column": column,
+                "column": sensor_id,
+                "f0": f0,
+                "ke": ke_value,
+            }
+            mapping_by_id[sensor_id] = {
+                "tirante": tirante,
                 "f0": f0,
                 "ke": ke_value,
             }
@@ -79,7 +97,12 @@ def build_sensor_config_payload(
     if issues:
         status = " | ".join([status] + issues)
 
-    store_payload = {"rows": rows, "complete": complete, "by_sensor": by_sensor}
+    store_payload = {
+        "rows": rows,
+        "complete": complete,
+        "by_sensor": by_sensor,
+        "mapping_by_id": mapping_by_id,
+    }
     return store_payload, status
 
 
@@ -213,68 +236,26 @@ def register_callbacks(app: Dash) -> None:
         return path, options, breadcrumb, disable_up, ""
 
     @app.callback(
-        Output("sensor-config-table", "data"),
-        Output("mapping-status", "children"),
-        Output("sensor-config-store", "data"),
-        Output("error-message", "children", allow_duplicate=True),
-        Input("apply-map-button", "n_clicks"),
-        State("map-textarea", "value"),
-        prevent_initial_call=True,
-    )
-    def apply_mapping(n_clicks: Optional[int], mapping_text: Optional[str]):
-        if not n_clicks:
-            raise PreventUpdate
-
-        try:
-            sensor_map: Dict[str, str] = json.loads(mapping_text or "{}")
-        except json.JSONDecodeError as exc:
-            return no_update, "", None, f"Error en mapeo JSON: {exc}"
-
-        if not sensor_map:
-            return [], "Defina al menos un sensor en el mapeo.", None, ""
-
-        save_mapping_text(sensor_map)
-
-        table_rows = []
-        for original, alias in sensor_map.items():
-            if isinstance(alias, dict):
-                tirante_value = alias.get("tirante") or original
-                f0_value = alias.get("f0")
-                ke_value = alias.get("ke")
-            else:
-                tirante_value = alias or original
-                f0_value = None
-                ke_value = None
-
-            table_rows.append(
-                {
-                    "column": original,
-                    "tirante": tirante_value,
-                    "f0": f0_value,
-                    "ke": ke_value,
-                }
-            )
-
-        mapping_message = (
-            f"Mapeo aplicado para {len(table_rows)} tirantes. Complete f₀ y Ke para continuar."
-        )
-        store_payload = {"rows": table_rows, "complete": False, "by_sensor": {}}
-        return table_rows, mapping_message, store_payload, ""
-
-    @app.callback(
         Output("sensor-config-store", "data", allow_duplicate=True),
         Output("sensor-config-status", "children"),
+        Output("mapping-status", "children"),
         Input("sensor-config-table", "data"),
         prevent_initial_call=True,
     )
     def sync_sensor_config(rows: Optional[list[dict[str, Any]]]):
         if not rows:
             save_sensor_config_store(None)
-            return None, DEFAULT_SENSOR_STATUS
+            return None, DEFAULT_SENSOR_STATUS, "Activa al menos un sensor para comenzar."
 
         store_payload, status = build_sensor_config_payload(rows)
         save_sensor_config_store(store_payload)
-        return store_payload, status
+        active_count = len(store_payload.get("by_sensor", {}))
+        mapping_message = (
+            f"{active_count} sensor(es) activo(s). Completa f₀ y Ke para habilitar el análisis."
+            if not store_payload.get("complete")
+            else f"{active_count} sensor(es) listo(s) para procesar archivos."
+        )
+        return store_payload, status, mapping_message
 
     @app.callback(
         Output("files-store", "data"),
@@ -495,7 +476,6 @@ def register_callbacks(app: Dash) -> None:
         Output("processed-history-store", "data", allow_duplicate=True),
         Output("results-history-store", "data", allow_duplicate=True),
         Input("active-file-store", "data"),
-        State("map-textarea", "value"),
         State("sensor-config-store", "data"),
         State("processed-history-store", "data"),
         State("results-history-store", "data"),
@@ -512,7 +492,6 @@ def register_callbacks(app: Dash) -> None:
     )
     def load_file(
         path_info,
-        mapping_text: Optional[str],
         config_data: Optional[Dict[str, Any]],
         history_state,
         results_history_state,
@@ -547,10 +526,7 @@ def register_callbacks(app: Dash) -> None:
                 no_update,
             )
 
-        try:
-            sensor_map: Dict[str, str] = json.loads(mapping_text or "{}")
-        except json.JSONDecodeError as exc:
-            return None, [], None, "", f"Error en mapeo JSON: {exc}", no_update, no_update
+        sensor_map: Dict[str, Any] = config_data.get("mapping_by_id") or {}
 
         try:
             df = load_and_prepare_data_from_file(path, sensor_map)

@@ -497,6 +497,49 @@ def build_layout() -> html.Div:
                                             ),
                                             html.Div(
                                                 [
+                                                html.Div(
+                                                    [
+                                                        html.Label("Modo de frecuencia base"),
+                                                        html.P(
+                                                            "El análisis usa la f₀ configurada para el tirante seleccionado. Activa el modo manual si necesitas probar otra frecuencia mientras retensas.",
+                                                            className="info-note",
+                                                        ),
+                                                        dcc.Checklist(
+                                                            id="manual-mode-toggle",
+                                                            options=[
+                                                                    {
+                                                                        "label": "Ingresar f₀ manual",
+                                                                        "value": "manual",
+                                                                    }
+                                                                ],
+                                                                value=[],
+                                                                className="compact-checklist",
+                                                            ),
+                                                        ],
+                                                        className="control-item",
+                                                    ),
+                                                    html.Div(
+                                                        [
+                                                            html.Label("f₀ manual (Hz)"),
+                                                            dcc.Input(
+                                                                id="manual-frequency-input",
+                                                                type="number",
+                                                                min=0.01,
+                                                                step=0.01,
+                                                                placeholder="Ej: 3.25",
+                                                            ),
+                                                            html.P(
+                                                                "Esta frecuencia guía la búsqueda de armónicos y la estimación de tensión para este tirante mientras el modo manual está activo. Se guarda por tirante para que puedas alternar entre ellos.",
+                                                                className="info-note",
+                                                            ),
+                                                        ],
+                                                        className="control-item",
+                                                    ),
+                                                ],
+                                                className="control-grid",
+                                            ),
+                                            html.Div(
+                                                [
                                                     html.Div(
                                                         [
                                                             html.Label("Modo de frecuencia base"),
@@ -787,6 +830,7 @@ def build_layout() -> html.Div:
             dcc.Store(id="processing-metadata-store"),
             dcc.Store(id="processed-history-store", data=[]),
             dcc.Store(id="results-history-store", data=[]),
+            dcc.Store(id="manual-settings-store", data={}),
             dcc.Store(
                 id="directory-browser-store",
                 data={"path": os.getcwd()},

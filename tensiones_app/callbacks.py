@@ -674,6 +674,7 @@ def register_callbacks(app: Dash) -> None:
         Input("tol-input", "value"),
         Input("manual-mode-toggle", "value"),
         Input("manual-frequency-input", "value"),
+        Input("manual-settings-store", "data"),
         Input("sensor-config-store", "data"),
         Input("graphs-toggle", "value"),
         prevent_initial_call=True,
@@ -692,6 +693,7 @@ def register_callbacks(app: Dash) -> None:
         tol_hz,
         manual_mode,
         manual_frequency,
+        manual_settings,
         sensor_config_data: Optional[Dict[str, Any]],
         graph_visibility,
     ):
@@ -729,11 +731,17 @@ def register_callbacks(app: Dash) -> None:
                 "No se encontraron parámetros configurados para el tirante seleccionado."
             )
 
-        manual_enabled = isinstance(manual_mode, list) and "manual" in manual_mode
-        manual_f0: Optional[float] = None
+        manual_settings = manual_settings or {}
+        stored_manual = manual_settings.get(sensor, {}) if isinstance(manual_settings, dict) else {}
+        manual_enabled_ui = isinstance(manual_mode, list) and "manual" in manual_mode
+        manual_enabled = bool(stored_manual.get("enabled")) or manual_enabled_ui
+        manual_f0: Optional[float] = stored_manual.get("f0")
+        if manual_enabled_ui:
+            manual_f0 = manual_frequency if manual_frequency is not None else manual_f0
+
         if manual_enabled:
             try:
-                manual_f0 = float(manual_frequency)
+                manual_f0 = float(manual_f0)
             except (TypeError, ValueError):
                 manual_f0 = None
 
@@ -1040,6 +1048,44 @@ def register_callbacks(app: Dash) -> None:
             title_parts.append("Sin actividad registrada")
 
         return str(value), "100", " · ".join(title_parts)
+
+    @app.callback(
+        Output("manual-settings-store", "data"),
+        Input("manual-mode-toggle", "value"),
+        Input("manual-frequency-input", "value"),
+        State("sensor-dropdown", "value"),
+        State("manual-settings-store", "data"),
+        prevent_initial_call=True,
+    )
+    def persist_manual_settings(mode_values, manual_frequency, sensor, current_store):
+        if not sensor:
+            raise PreventUpdate
+
+        manual_enabled = "manual" in (mode_values or [])
+        current_store = current_store or {}
+        previous = current_store.get(sensor, {}) if isinstance(current_store, dict) else {}
+        stored_frequency = manual_frequency
+        if stored_frequency is None:
+            stored_frequency = previous.get("f0")
+
+        current_store[sensor] = {"enabled": manual_enabled, "f0": stored_frequency}
+        return current_store
+
+    @app.callback(
+        Output("manual-mode-toggle", "value"),
+        Output("manual-frequency-input", "value"),
+        Input("sensor-dropdown", "value"),
+        Input("manual-settings-store", "data"),
+    )
+    def sync_manual_inputs(sensor, manual_store):
+        if not sensor:
+            return [], None
+
+        manual_store = manual_store or {}
+        entry = manual_store.get(sensor, {}) if isinstance(manual_store, dict) else {}
+        enabled = entry.get("enabled") is True
+        mode_value = ["manual"] if enabled else []
+        return mode_value, entry.get("f0")
 
     @app.callback(
         Output("manual-frequency-input", "disabled"),

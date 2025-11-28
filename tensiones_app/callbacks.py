@@ -672,6 +672,8 @@ def register_callbacks(app: Dash) -> None:
         Input("min-distance-input", "value"),
         Input("harmonics-input", "value"),
         Input("tol-input", "value"),
+        Input("manual-mode-toggle", "value"),
+        Input("manual-frequency-input", "value"),
         Input("sensor-config-store", "data"),
         Input("graphs-toggle", "value"),
         prevent_initial_call=True,
@@ -688,6 +690,8 @@ def register_callbacks(app: Dash) -> None:
         min_distance,
         n_harmonics,
         tol_hz,
+        manual_mode,
+        manual_frequency,
         sensor_config_data: Optional[Dict[str, Any]],
         graph_visibility,
     ):
@@ -700,7 +704,7 @@ def register_callbacks(app: Dash) -> None:
         def _card_style(key: str) -> Optional[Dict[str, str]]:
             return None if key in selected_graphs else {"display": "none"}
 
-        if not store_data or not sensor:
+        def _empty_response(error_message: str, pct_label: str = ""):
             return (
                 EMPTY_FIGURE,
                 EMPTY_FIGURE,
@@ -712,29 +716,34 @@ def register_callbacks(app: Dash) -> None:
                 _card_style("stft"),
                 [],
                 [],
-                "",
-                "",
+                pct_label,
+                error_message,
             )
+
+        if not store_data or not sensor:
+            return _empty_response("")
 
         sensor_params = (sensor_config_data or {}).get("by_sensor", {}).get(sensor)
         if not sensor_params:
-            return (
-                EMPTY_FIGURE,
-                EMPTY_FIGURE,
-                EMPTY_FIGURE,
-                EMPTY_FIGURE,
-                _card_style("full"),
-                _card_style("segment"),
-                _card_style("psd"),
-                _card_style("stft"),
-                [],
-                [],
-                "",
-                "No se encontraron parámetros configurados para el tirante seleccionado.",
+            return _empty_response(
+                "No se encontraron parámetros configurados para el tirante seleccionado."
             )
 
+        manual_enabled = isinstance(manual_mode, list) and "manual" in manual_mode
+        manual_f0: Optional[float] = None
+        if manual_enabled:
+            try:
+                manual_f0 = float(manual_frequency)
+            except (TypeError, ValueError):
+                manual_f0 = None
+
+            if manual_f0 is None or manual_f0 <= 0:
+                return _empty_response(
+                    "Ingresa una frecuencia manual válida para habilitar el modo manual."
+                )
+
         df = pd.read_json(StringIO(store_data["df"]), orient="split")
-        f0_hint = sensor_params.get("f0")
+        f0_hint = manual_f0 if manual_enabled else sensor_params.get("f0")
         ke_value = sensor_params.get("ke")
         use_hint = f0_hint is not None and f0_hint > 0
         tension_from_hint = None
@@ -1031,3 +1040,10 @@ def register_callbacks(app: Dash) -> None:
             title_parts.append("Sin actividad registrada")
 
         return str(value), "100", " · ".join(title_parts)
+
+    @app.callback(
+        Output("manual-frequency-input", "disabled"),
+        Input("manual-mode-toggle", "value"),
+    )
+    def toggle_manual_frequency_input(mode_values):
+        return "manual" not in (mode_values or [])

@@ -267,7 +267,7 @@ def build_layout() -> html.Div:
                                         {
                                             "name": "Activo",
                                             "id": "active",
-                                            "presentation": "checkbox",
+                                            "presentation": "dropdown",
                                             "editable": True,
                                         },
                                         {
@@ -294,6 +294,15 @@ def build_layout() -> html.Div:
                                         },
                                     ],
                                     data=initial_rows,
+                                    dropdown={
+                                        "active": {
+                                            "options": [
+                                                {"label": "Sí", "value": True},
+                                                {"label": "No", "value": False},
+                                            ],
+                                            "clearable": False,
+                                        }
+                                    },
                                     editable=True,
                                     row_deletable=False,
                                     fill_width=True,

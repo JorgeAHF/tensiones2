@@ -479,14 +479,44 @@ def build_layout() -> html.Div:
                                                                 step=256,
                                                                 value=2048,
                                                             ),
-                                                        ],
-                                                        className="control-item",
-                                                    ),
-                                                ],
-                                                className="control-grid",
-                                            ),
-                                        ],
-                                        className="parameter-section",
+                                                    ],
+                                                    className="control-item",
+                                                ),
+                                                html.Div(
+                                                    [
+                                                        html.Label("Modo manual"),
+                                                        dcc.Checklist(
+                                                            id="manual-mode-toggle",
+                                                            options=[
+                                                                {
+                                                                    "label": "Ingresar f₀ manual",
+                                                                    "value": "manual",
+                                                                }
+                                                            ],
+                                                            value=[],
+                                                            className="compact-checklist",
+                                                        ),
+                                                    ],
+                                                    className="control-item",
+                                                ),
+                                                html.Div(
+                                                    [
+                                                        html.Label("f₀ manual (Hz)"),
+                                                        dcc.Input(
+                                                            id="manual-frequency-input",
+                                                            type="number",
+                                                            min=0.01,
+                                                            step=0.01,
+                                                            placeholder="Ej: 3.25",
+                                                        ),
+                                                    ],
+                                                    className="control-item",
+                                                ),
+                                            ],
+                                            className="control-grid",
+                                        ),
+                                    ],
+                                    className="parameter-section",
                                     ),
                                     html.Div(
                                         [

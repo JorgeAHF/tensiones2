@@ -479,14 +479,14 @@ def build_layout() -> html.Div:
                                                                 step=256,
                                                                 value=2048,
                                                             ),
-                                                        ],
-                                                        className="control-item",
-                                                    ),
-                                                ],
-                                                className="control-grid",
-                                            ),
-                                        ],
-                                        className="parameter-section",
+                                                    ],
+                                                    className="control-item",
+                                                ),
+                                            ],
+                                            className="control-grid",
+                                        ),
+                                    ],
+                                    className="parameter-section",
                                     ),
                                     html.Div(
                                         [
@@ -494,6 +494,40 @@ def build_layout() -> html.Div:
                                             html.P(
                                                 "Configura los criterios para identificar la frecuencia fundamental y armónicos.",
                                                 className="section-description",
+                                            ),
+                                            html.Div(
+                                                [
+                                                    html.Label("Modo de frecuencia base"),
+                                                    html.P(
+                                                        "Activa el modo manual cuando quieras probar otra f₀ para el tirante seleccionado durante un retensado.",
+                                                        className="info-note",
+                                                    ),
+                                                    dcc.Checklist(
+                                                        id="manual-mode-toggle",
+                                                        options=[
+                                                            {
+                                                                "label": "Ingresar f₀ manual",
+                                                                "value": "manual",
+                                                            }
+                                                        ],
+                                                        value=[],
+                                                        className="compact-checklist",
+                                                    ),
+                                                    html.Label("f₀ manual (Hz)", className="control-inline-label"),
+                                                    dcc.Input(
+                                                        id="manual-frequency-input",
+                                                        type="number",
+                                                        min=0.01,
+                                                        step=0.01,
+                                                        placeholder="Ej: 3.25",
+                                                        className="control-inline-input",
+                                                    ),
+                                                    html.P(
+                                                        "La f₀ ingresada se usa como pista para buscar armónicos y estimar la tensión mientras el modo manual está activo para este tirante.",
+                                                        className="info-note",
+                                                    ),
+                                                ],
+                                                className="control-item",
                                             ),
                                             html.Div(
                                                 [
@@ -744,6 +778,7 @@ def build_layout() -> html.Div:
             dcc.Store(id="processing-metadata-store"),
             dcc.Store(id="processed-history-store", data=[]),
             dcc.Store(id="results-history-store", data=[]),
+            dcc.Store(id="manual-settings-store", data={}),
             dcc.Store(
                 id="directory-browser-store",
                 data={"path": os.getcwd()},

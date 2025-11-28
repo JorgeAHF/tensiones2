@@ -733,11 +733,8 @@ def register_callbacks(app: Dash) -> None:
 
         manual_settings = manual_settings or {}
         stored_manual = manual_settings.get(sensor, {}) if isinstance(manual_settings, dict) else {}
-        manual_enabled_ui = isinstance(manual_mode, list) and "manual" in manual_mode
-        manual_enabled = bool(stored_manual.get("enabled")) or manual_enabled_ui
-        manual_f0: Optional[float] = stored_manual.get("f0")
-        if manual_enabled_ui:
-            manual_f0 = manual_frequency if manual_frequency is not None else manual_f0
+        manual_enabled = isinstance(manual_mode, list) and "manual" in manual_mode
+        manual_f0: Optional[float] = manual_frequency if manual_frequency is not None else stored_manual.get("f0")
 
         if manual_enabled:
             try:
@@ -1070,22 +1067,6 @@ def register_callbacks(app: Dash) -> None:
 
         current_store[sensor] = {"enabled": manual_enabled, "f0": stored_frequency}
         return current_store
-
-    @app.callback(
-        Output("manual-mode-toggle", "value"),
-        Output("manual-frequency-input", "value"),
-        Input("sensor-dropdown", "value"),
-        Input("manual-settings-store", "data"),
-    )
-    def sync_manual_inputs(sensor, manual_store):
-        if not sensor:
-            return [], None
-
-        manual_store = manual_store or {}
-        entry = manual_store.get(sensor, {}) if isinstance(manual_store, dict) else {}
-        enabled = entry.get("enabled") is True
-        mode_value = ["manual"] if enabled else []
-        return mode_value, entry.get("f0")
 
     @app.callback(
         Output("manual-frequency-input", "disabled"),

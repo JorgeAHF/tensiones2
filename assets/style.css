@@ -591,6 +591,11 @@ body {
   border: 1px solid rgba(37, 99, 235, 0.16);
 }
 
+.info--subtle {
+  background: rgba(148, 163, 184, 0.12);
+  border-color: rgba(148, 163, 184, 0.32);
+}
+
 .error {
   background: rgba(248, 113, 113, 0.16);
   border: 1px solid rgba(248, 113, 113, 0.35);
@@ -679,6 +684,22 @@ body {
   flex-direction: column;
   gap: 10px;
   align-items: flex-start;
+}
+
+.table-card {
+  background: #ffffff;
+  border: 1px solid rgba(37, 99, 235, 0.12);
+  border-radius: 20px;
+  box-shadow: 0 12px 36px rgba(15, 23, 42, 0.08);
+  padding: 12px;
+}
+
+.table-card .dash-table-container {
+  padding: 6px;
+}
+
+.table-card .dash-spreadsheet-container .dash-spreadsheet-inner table {
+  width: 100%;
 }
 
 .processing-progress {

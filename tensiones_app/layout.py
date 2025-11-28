@@ -252,68 +252,82 @@ def build_layout() -> html.Div:
                                         "Los siguientes sensores están preconfigurados. Marca cuáles estarán activos y ajusta sus parámetros.",
                                         className="info",
                                     ),
+                                    html.Div(
+                                        f"{len(initial_rows)} sensor(es) preconfigurados. Activa solo los necesarios y completa sus parámetros.",
+                                        id="mapping-status",
+                                        className="info info--subtle",
+                                    ),
                                 ],
                                 className="input-stack",
                             ),
                             html.Div(
-                                f"{len(initial_rows)} sensor(es) preconfigurados. Activa solo los necesarios y completa sus parámetros.",
-                                id="mapping-status",
-                                className="info",
-                            ),
-                            DataTable(
-                                id="sensor-config-table",
-                                columns=[
-                                    {
-                                        "name": "Activo",
-                                        "id": "active",
-                                        "presentation": "checkbox",
-                                        "editable": True,
+                                DataTable(
+                                    id="sensor-config-table",
+                                    columns=[
+                                        {
+                                            "name": "Activo",
+                                            "id": "active",
+                                            "presentation": "checkbox",
+                                            "editable": True,
+                                        },
+                                        {
+                                            "name": "Sensor ID",
+                                            "id": "sensor_id",
+                                            "editable": False,
+                                        },
+                                        {
+                                            "name": "Tirante",
+                                            "id": "tirante",
+                                            "editable": True,
+                                        },
+                                        {
+                                            "name": "f₀ propuesta (Hz)",
+                                            "id": "f0",
+                                            "type": "numeric",
+                                            "editable": True,
+                                        },
+                                        {
+                                            "name": "Ke (Ton·s)",
+                                            "id": "ke",
+                                            "type": "numeric",
+                                            "editable": True,
+                                        },
+                                    ],
+                                    data=initial_rows,
+                                    editable=True,
+                                    row_deletable=False,
+                                    fill_width=True,
+                                    style_table={
+                                        "overflowX": "auto",
+                                        "minWidth": "100%",
                                     },
-                                    {
-                                        "name": "Sensor ID",
-                                        "id": "sensor_id",
-                                        "editable": False,
-                                    },
-                                    {
-                                        "name": "Tirante",
-                                        "id": "tirante",
-                                        "editable": True,
-                                    },
-                                    {
-                                        "name": "f₀ propuesta (Hz)",
-                                        "id": "f0",
-                                        "type": "numeric",
-                                        "editable": True,
-                                    },
-                                    {
-                                        "name": "Ke (Ton·s)",
-                                        "id": "ke",
-                                        "type": "numeric",
-                                        "editable": True,
-                                    },
-                                ],
-                                data=initial_rows,
-                                editable=True,
-                                row_deletable=False,
-                                style_header={
-                                    "backgroundColor": "#eef2ff",
-                                    "fontWeight": "600",
-                                    "color": "#1e1b4b",
-                                    "border": "0px",
-                                },
-                                style_cell={
-                                    "backgroundColor": "#ffffff",
-                                    "border": "0px",
-                                    "color": "#1f2937",
-                                    "fontFamily": "'Inter', 'Segoe UI', sans-serif",
-                                },
-                                style_data_conditional=[
-                                    {
-                                        "if": {"column_id": "sensor_id"},
+                                    style_header={
+                                        "backgroundColor": "#eef2ff",
                                         "fontWeight": "600",
                                         "color": "#1e1b4b",
-                                    }
-                                ],
+                                        "border": "0px",
+                                    },
+                                    style_cell={
+                                        "backgroundColor": "#ffffff",
+                                        "border": "0px",
+                                        "color": "#1f2937",
+                                        "fontFamily": "'Inter', 'Segoe UI', sans-serif",
+                                        "padding": "10px",
+                                    },
+                                    style_cell_conditional=[
+                                        {"if": {"column_id": "active"}, "width": "80px"},
+                                        {"if": {"column_id": "sensor_id"}, "width": "120px"},
+                                        {"if": {"column_id": "tirante"}, "width": "200px"},
+                                    ],
+                                    style_data_conditional=[
+                                        {
+                                            "if": {"column_id": "sensor_id"},
+                                            "fontWeight": "600",
+                                            "color": "#1e1b4b",
+                                        }
+                                    ],
+                                ),
+                                className="table-card",
                             ),
                         ],
                         className="panel",
